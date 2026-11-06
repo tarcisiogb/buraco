@@ -31,6 +31,8 @@ jobs:
           cands = [raw.strip()]
           t = raw.strip().strip("\u201c\u201d\"'").strip()
           cands.append(t)
+          cands.append("{" + raw.strip())
+          cands.append("{" + raw.strip() + "}")
           try: cands.append(base64.b64decode(raw.strip()).decode("utf-8"))
           except Exception: pass
           d = None
