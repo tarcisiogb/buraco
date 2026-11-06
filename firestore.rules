@@ -32,5 +32,28 @@ service cloud.firestore {
       // Master aprova, recusa, edita e remove.
       allow update, delete: if isMaster();
     }
+
+    // Mesas de jogo: qualquer jogador aprovado cria, senta e le.
+    match /mesas/{mid} {
+      allow read: if isApproved();
+      allow create: if isApproved()
+        && request.resource.data.criadoPor == request.auth.uid
+        && request.resource.data.status == 'aguardando';
+      allow update: if isApproved()
+        && (resource.data.status == 'aguardando'
+            || request.auth.uid in resource.data.seats
+            || isMaster());
+      allow delete: if isApproved()
+        && (resource.data.criadoPor == request.auth.uid || isMaster());
+
+      // Estado da partida (JSON do engine): so quem esta sentado escreve.
+      match /estado/{doc} {
+        allow read: if isApproved();
+        allow write: if isApproved()
+          && (request.auth.uid in get(/databases/$(database)/documents/mesas/$(mid)).data.seats
+              || isMaster()
+              || get(/databases/$(database)/documents/mesas/$(mid)).data.criadoPor == request.auth.uid);
+      }
+    }
   }
 }
