@@ -31,7 +31,7 @@
 
 1. Embaralhar as 104 cartas
 2. Distribuir **11 cartas** para cada jogador (44 cartas)
-3. Separar **2 mortos** de **11 cartas** cada (22 cartas): um para cada dupla
+3. Separar **2 mortos** de **11 cartas** cada (22 cartas), ao centro da mesa. **Os mortos não têm dono**: ficam de quem esvaziar a mão primeiro
 4. O restante forma o **monte** (104 - 44 - 22 = 38 cartas)
 5. O **lixo começa vazio**
 
@@ -120,10 +120,10 @@ Canastra é um **jogo com 7 ou mais cartas**.
 ## 6. MORTO E FIM DO MONTE
 
 ### 6.1 Regras gerais
-- São **2 mortos**, um para cada dupla (11 cartas cada)
+- São **2 mortos** (11 cartas cada), sem dono definido. Quem pega primeiro fica com um; a outra dupla, se esvaziar depois, pega o que sobrou
 - O morto é pego quando um jogador da dupla **fica sem cartas na mão**
 - **Não há nenhuma exigência** para pegar o morto
-- Cada dupla só pode pegar **1 morto**
+- Cada dupla só pode pegar **1 morto**, e só enquanto ainda houver morto na mesa
 
 ### 6.2 Como o jogador fica sem cartas
 | Situação | O que acontece |
@@ -134,8 +134,8 @@ Canastra é um **jogo com 7 ou mais cartas**.
 ### 6.3 Monte acabou
 1. Se houver morto ainda não pego, suas 11 cartas viram o **novo monte**
 2. Se os **dois mortos** estiverem disponíveis, **um é sorteado** aleatoriamente
-3. A dupla dona do morto que virou monte o perdeu: **não pega mais morto**, leva **-100** na pontuação final e, sem morto, não consegue bater (seção 7.1)
-4. Se o novo monte acabar e ainda restar o outro morto, ele vira monte também (mesma regra). Nesse cenário, **as duas duplas perdem 100**
+3. Como o morto não tem dono, ninguém perde nada na hora: **quem terminar a rodada sem ter pego um morto leva -100** (seção 8.2) e, sem morto, não consegue bater (seção 7.1). A dupla que ainda não pegou pode pegar o morto que restou, se esvaziar a mão antes
+4. Se o novo monte acabar e ainda restar o outro morto, ele vira monte também. Nesse cenário, **nenhuma dupla pegou morto, então as duas perdem 100**
 5. Se o monte acabar e **não houver mais morto** para virar monte, a **rodada termina** (a partida segue até 3.000, seção 8.4). O placar é calculado como na seção 8: canastras, cartas nos jogos, cartas na mão como negativo e -100 para quem não pegou o morto.
 
 ---
@@ -191,7 +191,7 @@ GAME_OVER        → uma dupla atingiu 3.000
 EVENTOS:
 MORTO_EM_PE      → esvaziou a mão sem descartar: pega o morto, segue em PLAYING (relógio de 40s reinicia)
 MORTO_DESCARTE   → esvaziou a mão descartando: pega o morto, turno encerra
-MORTO_VIRA_MONTE → monte acabou: morto não pego (sorteado, se houver dois) vira o novo monte
+MORTO_VIRA_MONTE → monte acabou: um morto não pego (sorteado, se houver dois) vira o novo monte
 BATIDA           → condições da seção 7.1 cumpridas
 TIMEOUT_COMPRA   → 20s esgotados: compra automática
 TIMEOUT_JOGADA   → 40s esgotados: descarte automático
@@ -200,6 +200,8 @@ TIMEOUT_JOGADA   → 40s esgotados: descarte automático
 ---
 
 ## 10. TEMPO DE JOGADA E AÇÕES AUTOMÁTICAS
+
+> **O relógio é opcional e vem DESLIGADO por padrão** (decisão de 06/11/2026: a internet instável travava as partidas). As regras desta seção só valem quando o tempo é ligado na configuração (`drawSeconds` / `playSeconds`).
 
 ### 10.1 Limites
 | Etapa | Tempo | O que o jogador precisa fazer |
@@ -238,6 +240,7 @@ Quando o jogador pega o morto em pé e continua o turno, o relógio de **40s rei
 | Dupla tenta bater sem ter pego o morto | Inválido |
 | Dupla tenta bater sem canastra limpa | Inválido |
 | Dupla tenta pegar um segundo morto | Inválido |
+| Os dois mortos já foram pegos | Quem esvaziar a mão depois cai na regra da última carta (seção 3.4) |
 | Ação deixaria o jogador sem cartas, sem pegar morto nem bater | Impedida (seção 3.4) |
 | Retirar carta já baixada | Inválido |
 | Unir dois jogos | Inválido |
@@ -258,3 +261,12 @@ Não há pontos em aberto. Ao fechar o documento, assumi duas coisas que você n
 
 1. **Compra automática, jogo novo com a mão:** a checagem usa as cartas que o jogador já tem na mão **antes** de pegar o lixo (mais a carta do topo).
 2. **Desempate no descarte automático:** o 2 é o último a ser descartado entre cartas de mesma pontuação, por ser coringa.
+
+---
+
+## 13. PAUSA E ENCERRAMENTO ANTECIPADO
+
+- **Pausar:** qualquer um dos 4 jogadores pausa a partida. Enquanto estiver pausada, ninguém joga; qualquer jogador pode continuar. Se o relógio estiver ligado, ele não corre durante a pausa.
+- **Encerrar a partida antes da meta:** qualquer jogador **propõe**; os **4 precisam aceitar**. Um "recusar" cancela a proposta. O administrador da mesa (criador ou Master) pode encerrar na hora.
+- **Placar do encerramento:** vale o placar acumulado das rodadas já terminadas (a rodada em andamento **não** conta). Vence a dupla com mais pontos; se igual, empate.
+- **Adicionar várias cartas:** é possível selecionar várias cartas e tocar num jogo da dupla. Elas entram **uma por vez**, na ordem em que encaixarem; se alguma não encaixar, nenhuma é aplicada.

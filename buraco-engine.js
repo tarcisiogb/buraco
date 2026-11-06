@@ -45,8 +45,8 @@
 
   const DEFAULT_CONFIG = {
     targetScore: 3000,          // seção 8.4
-    drawSeconds: 20,            // seção 10.1
-    playSeconds: 40,            // seção 10.1
+    drawSeconds: 0,             // seção 10.1: 0 = sem limite de tempo (use 20 para o relógio de compra)
+    playSeconds: 0,             // seção 10.1: 0 = sem limite de tempo (use 40 para o relógio de jogadas)
     batidaBonus: 100,           // seção 7.2: bônus de 100 para quem bate (ajustável)
     stockEmptyEnd: 'after_turn' // 'after_turn' | 'immediate' — quando a rodada acaba se o monte esgota sem morto (6.3.5)
   };
@@ -274,6 +274,8 @@
       discard: [],
       phase: 'SETUP',
       turn: { player: 0, deadline: null, drewFrom: null },
+      paused: null,
+      endVote: null,
       pendingRoundEnd: false,
       roundResult: null,
       winner: null,
@@ -290,14 +292,14 @@
     state.players.forEach((p) => { p.hand = []; });
     for (let i = 0; i < 44; i++) state.players[i % 4].hand.push(deck.pop());
     state.mortos = [
-      { owner: 'A', cards: deck.splice(0, 11) },
-      { owner: 'B', cards: deck.splice(0, 11) }
+      { cards: deck.splice(0, 11) },
+      { cards: deck.splice(0, 11) }
     ];
     state.stock = deck;
     state.discard = [];
     state.teams = {
-      A: { melds: [], mortoTaken: false, mortoLost: false },
-      B: { melds: [], mortoTaken: false, mortoLost: false }
+      A: { melds: [], mortoTaken: false },
+      B: { melds: [], mortoTaken: false }
     };
     state.pendingRoundEnd = false;
     state.roundResult = null;
@@ -306,9 +308,12 @@
     startTurn(state, state.firstPlayer, now);
   }
 
+  /** Prazo em ms, ou null quando o tempo está desligado (segundos <= 0) */
+  function deadlineIn(seconds, now) { return seconds > 0 ? now + seconds * 1000 : null; }
+
   function startTurn(state, player, now) {
     state.phase = 'WAITING_TURN';
-    state.turn = { player, deadline: now + state.config.drawSeconds * 1000, drewFrom: null };
+    state.turn = { player, deadline: deadlineIn(state.config.drawSeconds, now), drewFrom: null };
   }
 
   const cur = (state) => state.players[state.turn.player];
@@ -319,14 +324,13 @@
   function emptyOutcome(state, playerIdx) {
     const t = teamOf(playerIdx);
     const team = state.teams[t];
-    if (!team.mortoTaken && !team.mortoLost && state.mortos.some((m) => m.owner === t)) return 'MORTO';
+    if (!team.mortoTaken && state.mortos.length > 0) return 'MORTO'; // o morto não tem dono: vale quem esvaziar a mão primeiro
     if (team.mortoTaken && hasCleanCanastra(team)) return 'BATIDA';
     return null; // regra da última carta (3.4)
   }
 
   function takeMorto(state, player, standing, events) {
-    const i = state.mortos.findIndex((m) => m.owner === player.team);
-    const m = state.mortos.splice(i, 1)[0];
+    const m = state.mortos.splice(0, 1)[0];
     player.hand = m.cards;
     state.teams[player.team].mortoTaken = true;
     events.push({ type: standing ? 'MORTO_EM_PE' : 'MORTO_DESCARTE', player: player.id });
@@ -338,8 +342,7 @@
       const i = state.mortos.length === 1 ? 0 : Math.floor(nextRandom(state) * state.mortos.length);
       const m = state.mortos.splice(i, 1)[0];
       state.stock = m.cards;
-      state.teams[m.owner].mortoLost = true;
-      events.push({ type: 'MORTO_VIRA_MONTE', owner: m.owner, cards: m.cards.length });
+      events.push({ type: 'MORTO_VIRA_MONTE', cards: m.cards.length });
     } else if (state.config.stockEmptyEnd === 'immediate') {
       finishRound(state, 'STOCK_EMPTY', null, events, now);
     } else {
@@ -353,6 +356,7 @@
   function checkTurn(state, action, phase) {
     if (state.phase === 'ROUND_OVER') return fail('ROUND_OVER', 'A rodada terminou.');
     if (state.phase === 'GAME_OVER') return fail('GAME_OVER', 'O jogo terminou.');
+    if (state.paused) return fail('PAUSED', 'O jogo está pausado.');
     if (action.player !== state.turn.player) return fail('NOT_YOUR_TURN', 'Não é a sua vez.');
     if (state.phase !== phase) {
       return fail('WRONG_PHASE', phase === 'WAITING_TURN' ? 'Você já comprou nesta vez.' : 'Compre uma carta primeiro.');
@@ -366,7 +370,7 @@
     p.hand.push(state.stock.pop());
     state.phase = 'PLAYING';
     state.turn.drewFrom = 'STOCK';
-    state.turn.deadline = now + state.config.playSeconds * 1000;
+    state.turn.deadline = deadlineIn(state.config.playSeconds, now);
     events.push({ type: 'DREW_STOCK', player: p.id });
     if (state.stock.length === 0) onStockEmpty(state, now, events);
     return ok();
@@ -380,7 +384,7 @@
     state.discard = [];
     state.phase = 'PLAYING';
     state.turn.drewFrom = 'DISCARD';
-    state.turn.deadline = now + state.config.playSeconds * 1000;
+    state.turn.deadline = deadlineIn(state.config.playSeconds, now);
     events.push({ type: 'DREW_DISCARD', player: p.id, cards: taken });
     return ok();
   }
@@ -391,7 +395,7 @@
       const out = emptyOutcome(state, p.id);
       if (out === 'MORTO') {
         takeMorto(state, p, true, events); // em pé: continua o turno (6.2)
-        state.turn.deadline = now + state.config.playSeconds * 1000; // relógio reinicia (10.4)
+        state.turn.deadline = deadlineIn(state.config.playSeconds, now); // relógio reinicia (10.4)
         return ok();
       }
       if (out === 'BATIDA') {
@@ -439,6 +443,27 @@
     meld.cards = lay.entries;
     events.push({ type: 'CARD_ADDED', player: p.id, meldId: meld.id, size: lay.size });
     return afterPlay(state, p, now, events);
+  }
+
+  /** Adiciona várias cartas da mão a um mesmo jogo, na ordem em que encaixarem (cada uma entra uma por vez) */
+  function doAddMany(state, action, now, events) {
+    const p = cur(state);
+    let rest = (action.cardIds || []).slice();
+    if (!rest.length || new Set(rest).size !== rest.length) return fail('INVALID_MELD', 'Cartas inválidas.');
+    let guard = 0;
+    while (rest.length && guard++ < 40) {
+      let progressed = false;
+      for (const id of rest.slice()) {
+        if (state.phase !== 'PLAYING' || p.hand.length === 0) break;
+        const before = JSON.stringify(state.teams[p.team].melds);
+        const res = doAdd(state, { meldId: action.meldId, cardId: id, option: 0 }, now, events);
+        if (res.ok) { rest = rest.filter((x) => x !== id); progressed = true; }
+        else if (res.error.code === 'INVALID_MELD' && JSON.stringify(state.teams[p.team].melds) === before) continue;
+        else return res;
+      }
+      if (!progressed) return fail('INVALID_MELD', 'Essas cartas não encaixam nesse jogo.');
+    }
+    return rest.length ? fail('INVALID_MELD', 'Essas cartas não encaixam nesse jogo.') : ok();
   }
 
   function doDiscard(state, cardId, now, events) {
@@ -536,6 +561,68 @@
     dealRound(state, now);
   }
 
+  // ───────────────────────── Pausa e encerramento antecipado ─────────────────────────
+
+  const validSeat = (i) => Number.isInteger(i) && i >= 0 && i < 4;
+
+  function doPause(state, action, now, events) {
+    if (state.phase === 'GAME_OVER') return fail('GAME_OVER', 'O jogo terminou.');
+    if (!validSeat(action.player)) return fail('INVALID_PLAYER', 'Jogador inválido.');
+    if (state.paused) return fail('PAUSED', 'O jogo já está pausado.');
+    state.paused = { by: action.player, at: now };
+    events.push({ type: 'PAUSED', player: action.player });
+    return ok();
+  }
+
+  function doResume(state, action, now, events) {
+    if (!state.paused) return fail('NOT_PAUSED', 'O jogo não está pausado.');
+    if (state.turn.deadline != null) state.turn.deadline += Math.max(0, now - state.paused.at);
+    state.paused = null;
+    events.push({ type: 'RESUMED', player: action.player });
+    return ok();
+  }
+
+  function finishEarly(state, events) {
+    const a = state.scores.A, b = state.scores.B;
+    state.winner = a > b ? 'A' : b > a ? 'B' : null;
+    state.phase = 'GAME_OVER';
+    state.turn.deadline = null;
+    state.paused = null;
+    state.endVote = null;
+    state.pendingRoundEnd = false;
+    state.roundResult = { reason: 'EARLY', by: null, detail: null, scoresAfter: { A: a, B: b } };
+    events.push({ type: 'GAME_OVER', reason: 'EARLY', by: null, winner: state.winner, scores: { A: a, B: b } });
+  }
+
+  function doProposeEnd(state, action, now, events) {
+    if (state.phase === 'GAME_OVER') return fail('GAME_OVER', 'O jogo terminou.');
+    if (!validSeat(action.player)) return fail('INVALID_PLAYER', 'Jogador inválido.');
+    if (state.endVote) return fail('VOTE_OPEN', 'Já existe uma proposta de encerramento.');
+    state.endVote = { by: action.player, yes: [action.player] };
+    events.push({ type: 'END_PROPOSED', player: action.player });
+    return ok();
+  }
+
+  function doVoteEnd(state, action, now, events) {
+    if (!state.endVote) return fail('NO_VOTE', 'Não há proposta de encerramento.');
+    if (!validSeat(action.player)) return fail('INVALID_PLAYER', 'Jogador inválido.');
+    if (!action.yes) {
+      state.endVote = null;
+      events.push({ type: 'END_REFUSED', player: action.player });
+      return ok();
+    }
+    if (!state.endVote.yes.includes(action.player)) state.endVote.yes.push(action.player);
+    if (state.endVote.yes.length >= 4) finishEarly(state, events);
+    return ok();
+  }
+
+  /** Encerramento imediato (uso do administrador da mesa) */
+  function doEndNow(state, action, now, events) {
+    if (state.phase === 'GAME_OVER') return fail('GAME_OVER', 'O jogo terminou.');
+    finishEarly(state, events);
+    return ok();
+  }
+
   // ───────────────────────── Tempo (seção 10) ─────────────────────────
 
   /** Vizinhos: mesmo naipe e posições consecutivas (Ás vale 1 e 14) */
@@ -616,6 +703,7 @@
    */
   function processTimeouts(state, now) {
     const events = [];
+    if (state.paused) return events;
     let guard = 0;
     while (
       (state.phase === 'WAITING_TURN' || state.phase === 'PLAYING') &&
@@ -654,7 +742,17 @@
         const c = checkTurn(state, action, 'PLAYING');
         return c || doDiscard(state, action.cardId, now, events);
       }
+      case 'ADD_MANY': {
+        const c = checkTurn(state, action, 'PLAYING');
+        return c || doAddMany(state, action, now, events);
+      }
+      case 'PAUSE': return doPause(state, action, now, events);
+      case 'RESUME': return doResume(state, action, now, events);
+      case 'PROPOSE_END': return doProposeEnd(state, action, now, events);
+      case 'VOTE_END': return doVoteEnd(state, action, now, events);
+      case 'END_NOW': return doEndNow(state, action, now, events);
       case 'START_NEXT_ROUND':
+        if (state.paused) return fail('PAUSED', 'O jogo está pausado.');
         if (state.phase !== 'ROUND_OVER') return fail('WRONG_PHASE', 'A rodada ainda não terminou.');
         startNextRound(state, now);
         events.push({ type: 'ROUND_STARTED', round: state.round });
@@ -669,14 +767,23 @@
    * Retorna { ok, state, events, error? }. Em caso de erro, `state` é o estado
    * (já avançado pelos timeouts, se houve) que deve ser persistido.
    */
+  /** Registra eventos no log do estado com número de sequência (n) estável entre dispositivos */
+  function appendLog(state, events, now) {
+    let n = state.logSeq || 0;
+    state.log = (state.log || []).concat(events.map((e) => Object.assign({ n: ++n, at: now }, e))).slice(-60);
+    state.logSeq = n;
+  }
+
   function applyAction(state, action, now = Date.now()) {
     const base = clone(state);
     const events = processTimeouts(base, now);
+    if (events.length) appendLog(base, events, now);
     const work = clone(base);
-    const res = dispatch(work, action, now, events);
+    const evs = [];
+    const res = dispatch(work, action, now, evs);
     if (!res.ok) return { ok: false, error: res.error, state: base, events };
-    work.log = (work.log || []).concat(events.map((e) => Object.assign({ at: now }, e))).slice(-60);
-    return { ok: true, state: work, events };
+    appendLog(work, evs, now);
+    return { ok: true, state: work, events: events.concat(evs) };
   }
 
   /** Disposições possíveis para baixar um jogo novo com estas cartas da mão */
@@ -715,7 +822,9 @@
       teams: state.teams,
       stockCount: state.stock.length,
       discard: state.discard,
-      mortos: state.mortos.map((m) => ({ owner: m.owner, count: m.cards.length })),
+      mortos: state.mortos.map((m) => ({ count: m.cards.length })),
+      paused: state.paused,
+      endVote: state.endVote,
       pendingRoundEnd: state.pendingRoundEnd,
       roundResult: state.roundResult,
       winner: state.winner

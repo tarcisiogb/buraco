@@ -16,13 +16,13 @@ const ids = (cards) => cards.map((c) => c.id);
 
 /** Estado limpo: mãos vazias, monte de reis de paus, mortos de enchimento */
 function fresh(opts = {}) {
-  const s = E.createGame({ seed: 1, now: 0, config: opts.config });
+  const s = E.createGame({ seed: 1, now: 0, config: Object.assign({ drawSeconds: 20, playSeconds: 40 }, opts.config) });
   s.players.forEach((p) => { p.hand = []; });
   s.stock = K(Array(30).fill('KC').join(' '));
   s.discard = [];
   s.mortos = [
-    { owner: 'A', cards: K('3H 3H 4H 4H 5H 5H 6H 6H 7H 7H 8H') },
-    { owner: 'B', cards: K('3D 3D 4D 4D 5D 5D 6D 6D 7D 7D 8D') }
+    { cards: K('3H 3H 4H 4H 5H 5H 6H 6H 7H 7H 8H') },
+    { cards: K('3D 3D 4D 4D 5D 5D 6D 6D 7D 7D 8D') }
   ];
   s.turn = { player: 0, deadline: 20000, drewFrom: null };
   s.phase = 'WAITING_TURN';
@@ -315,13 +315,13 @@ test('esvaziar descartando: pega o morto e o turno acaba', () => {
 test('regra da última carta: não pode esvaziar sem morto nem batida', () => {
   let s = fresh();
   s.teams.A.mortoTaken = true;
-  s.mortos = s.mortos.filter((m) => m.owner !== 'A');
+  s.mortos.shift();
   s.turn.player = 0; s.phase = 'PLAYING';
   s.players[0].hand = K('9H');
   assert.strictEqual(play(s, { type: 'DISCARD', player: 0, cardId: s.players[0].hand[0].id }).error.code, 'LAST_CARD_RULE');
   let t = fresh();
   t.teams.A.mortoTaken = true;
-  t.mortos = t.mortos.filter((m) => m.owner !== 'A');
+  t.mortos.shift();
   t.turn.player = 0; t.phase = 'PLAYING';
   t.players[0].hand = K('5S 6S 7S');
   assert.strictEqual(play(t, { type: 'LAY_MELD', player: 0, cardIds: ids(t.players[0].hand) }).error.code, 'LAST_CARD_RULE');
@@ -329,7 +329,7 @@ test('regra da última carta: não pode esvaziar sem morto nem batida', () => {
 test('baixar deixando 1 carta sem poder descartar é recusado (beco sem saída)', () => {
   let t = fresh();
   t.teams.A.mortoTaken = true;
-  t.mortos = t.mortos.filter((m) => m.owner !== 'A');
+  t.mortos.shift();
   t.turn.player = 0; t.phase = 'PLAYING';
   t.players[0].hand = K('5S 6S 7S 9H');
   assert.strictEqual(play(t, { type: 'LAY_MELD', player: 0, cardIds: ids(t.players[0].hand.slice(0, 3)) }).error.code, 'LAST_CARD_RULE');
@@ -337,7 +337,7 @@ test('baixar deixando 1 carta sem poder descartar é recusado (beco sem saída)'
 test('parceiro com cartas: jogador vazio da dupla só pega morto uma vez', () => {
   let s = fresh();
   s.teams.A.mortoTaken = true;
-  s.mortos = s.mortos.filter((m) => m.owner !== 'A');
+  s.mortos.shift();
   assert.strictEqual(E.emptyOutcome(s, 0), null);
   assert.strictEqual(E.emptyOutcome(s, 1), 'MORTO');
 });
@@ -346,7 +346,7 @@ test('parceiro com cartas: jogador vazio da dupla só pega morto uma vez', () =>
 test('bater: morto pego + canastra limpa → fim da rodada, +100', () => {
   let s = fresh();
   s.teams.A.mortoTaken = true;
-  s.mortos = s.mortos.filter((m) => m.owner !== 'A');
+  s.mortos.shift();
   addMeld(s, 'A', '3S 4S 5S 6S 7S 8S 9S');
   s.turn.player = 0; s.phase = 'PLAYING';
   s.players[0].hand = K('9H');
@@ -358,14 +358,14 @@ test('bater: morto pego + canastra limpa → fim da rodada, +100', () => {
 test('bater sem canastra limpa é impedido', () => {
   let s = fresh();
   s.teams.A.mortoTaken = true;
-  s.mortos = s.mortos.filter((m) => m.owner !== 'A');
+  s.mortos.shift();
   addMeld(s, 'A', '3S 4S 5S 6S 7S 8S 2H'); // suja
   assert.strictEqual(E.emptyOutcome(s, 0), null);
 });
 test('bônus de batida pode ser configurado (0 = sem bônus)', () => {
   let s = fresh({ config: { batidaBonus: 0 } });
   s.teams.A.mortoTaken = true;
-  s.mortos = s.mortos.filter((m) => m.owner !== 'A');
+  s.mortos.shift();
   addMeld(s, 'A', '3S 4S 5S 6S 7S 8S 9S');
   s.turn.player = 0; s.phase = 'PLAYING';
   s.players[0].hand = K('9H');
@@ -377,7 +377,7 @@ test('bater de novo depois de pegar o morto em pé', () => {
   addMeld(s, 'A', '3S 4S 5S 6S 7S 8S 9S');
   s.turn.player = 0; s.phase = 'PLAYING'; s.turn.deadline = 99999;
   s.players[0].hand = K('5H 6H 7H');
-  s.mortos.find((m) => m.owner === 'A').cards = K('8C 9C 10C');
+  s.mortos[0].cards = K('8C 9C 10C');
   s = must(play(s, { type: 'LAY_MELD', player: 0, cardIds: ids(s.players[0].hand) }, 100));
   assert.strictEqual(s.teams.A.mortoTaken, true);
   const h = s.players[0].hand;
@@ -387,33 +387,45 @@ test('bater de novo depois de pegar o morto em pé', () => {
 });
 
 // ───────── Monte esgotado
-test('monte acaba: morto vira monte e dupla dona o perde', () => {
+test('monte acaba: um morto vira monte (sem dono); quem não pegou morto leva -100', () => {
   let s = fresh();
   s.stock = K('KC');
-  s.mortos = [{ owner: 'B', cards: K('3D 3D 4D') }];
-  s.mortos.push({ owner: 'A', cards: K('3H 3H 4H') });
-  s.teams.A.mortoTaken = true; s.mortos = s.mortos.filter((m) => m.owner === 'B');
+  s.mortos = [{ cards: K('3D 3D 4D') }];
+  s.teams.A.mortoTaken = true;
   s.players[0].hand = K('9H');
   s = must(play(s, { type: 'DRAW_STOCK', player: 0 }));
   assert.strictEqual(s.stock.length, 3);
-  assert.strictEqual(s.teams.B.mortoLost, true);
   assert.strictEqual(s.mortos.length, 0);
+  assert.strictEqual(E.scoreRound(s, null).B.morto, -100);
+  assert.strictEqual(E.scoreRound(s, null).A.morto, 0);
 });
-test('dois mortos: um é sorteado; segundo esgotamento → rodada termina com -100 para os dois', () => {
+test('morto não tem dono: a segunda dupla a esvaziar pega o que sobrou; a terceira vez não há', () => {
+  let s = fresh();
+  assert.strictEqual(E.emptyOutcome(s, 0), 'MORTO');
+  assert.strictEqual(E.emptyOutcome(s, 1), 'MORTO');
+  s.turn.player = 1; s.phase = 'PLAYING';
+  s.players[1].hand = K('9H');
+  s = must(play(s, { type: 'DISCARD', player: 1, cardId: s.players[1].hand[0].id }));
+  assert.strictEqual(s.teams.B.mortoTaken, true);
+  assert.strictEqual(s.mortos.length, 1);
+  assert.strictEqual(E.emptyOutcome(s, 0), 'MORTO');
+  s.teams.A.mortoTaken = true; s.mortos = [];
+  assert.strictEqual(E.emptyOutcome(s, 2), null);
+});
+test('dois mortos viram monte: rodada termina com -100 para as duas duplas', () => {
   let s = fresh();
   s.stock = K('KC');
-  s.mortos = [{ owner: 'A', cards: K('3H') }, { owner: 'B', cards: K('3D') }];
+  s.mortos = [{ cards: K('3H') }, { cards: K('3D') }];
   s.players.forEach((p) => { p.hand = K('9H 9D'); });
   s = must(play(s, { type: 'DRAW_STOCK', player: 0 }));
   assert.strictEqual(s.stock.length, 1);
   assert.strictEqual(s.mortos.length, 1);
   s = must(play(s, { type: 'DISCARD', player: 0, cardId: s.players[0].hand[0].id }));
-  s = must(play(s, { type: 'DRAW_STOCK', player: 1 })); // esgota de novo
+  s = must(play(s, { type: 'DRAW_STOCK', player: 1 }));
   assert.strictEqual(s.mortos.length, 0);
-  assert.strictEqual(s.teams.A.mortoLost && s.teams.B.mortoLost, true);
   s = must(play(s, { type: 'DISCARD', player: 1, cardId: s.players[1].hand[0].id }));
   s = must(play(s, { type: 'DRAW_STOCK', player: 2 }));
-  assert.strictEqual(s.pendingRoundEnd, true); // não há mais morto
+  assert.strictEqual(s.pendingRoundEnd, true);
   s = must(play(s, { type: 'DISCARD', player: 2, cardId: s.players[2].hand[0].id }));
   assert.strictEqual(s.phase, 'ROUND_OVER');
   assert.strictEqual(s.roundResult.detail.A.morto, -100);
@@ -466,9 +478,8 @@ test('morto não pego: -100', () => {
   const s = fresh();
   assert.strictEqual(E.scoreRound(s, null).A.morto, -100);
 });
-test('morto que virou monte conta como não pego (-100)', () => {
+test('dupla sem morto pego leva -100 mesmo que o morto tenha virado monte', () => {
   const s = fresh();
-  s.teams.A.mortoLost = true;
   assert.strictEqual(E.scoreRound(s, null).A.morto, -100);
 });
 
@@ -626,7 +637,7 @@ test('viewFor esconde mãos alheias, monte e mortos', () => {
   assert(!JSON.stringify(v).includes('"cards":[{"id"') || !v.mortos[0].cards);
 });
 test('partida simulada completa só com timeouts termina sem erros', () => {
-  let s = E.createGame({ seed: 11, now: 0 });
+  let s = E.createGame({ seed: 11, now: 0, config: { drawSeconds: 20, playSeconds: 40 } });
   let t = 0, guard = 0;
   while (s.phase !== 'GAME_OVER' && s.round <= 3 && guard++ < 5000) {
     t += 61000;
@@ -639,6 +650,68 @@ test('partida simulada completa só com timeouts termina sem erros', () => {
   }
   assert(guard < 5000, 'travou');
   assert(s.round >= 3);
+});
+
+// ───────── Sem tempo, pausa, encerramento, várias cartas
+test('por padrão não há limite de tempo', () => {
+  let s = E.createGame({ seed: 3, now: 0 });
+  assert.strictEqual(s.turn.deadline, null);
+  assert.deepStrictEqual(E.processTimeouts(s, 9e9), []);
+  s = must(play(s, { type: 'DRAW_STOCK', player: 0 }, 5));
+  assert.strictEqual(s.turn.deadline, null);
+});
+test('pausa bloqueia jogadas e retoma; relógio não corre durante a pausa', () => {
+  let s = fresh();
+  s.players[0].hand = K('3S 9H');
+  s = must(play(s, { type: 'PAUSE', player: 2 }, 1000));
+  assert.strictEqual(s.paused.by, 2);
+  assert.strictEqual(play(s, { type: 'DRAW_STOCK', player: 0 }, 2000).error.code, 'PAUSED');
+  assert.deepStrictEqual(E.processTimeouts(JSON.parse(JSON.stringify(s)), 999999), []);
+  s = must(play(s, { type: 'RESUME', player: 1 }, 31000));
+  assert.strictEqual(s.paused, null);
+  assert.strictEqual(s.turn.deadline, 20000 + 30000);
+  s = must(play(s, { type: 'DRAW_STOCK', player: 0 }, 32000));
+});
+test('não retoma jogo que não está pausado', () => {
+  assert.strictEqual(play(fresh(), { type: 'RESUME', player: 0 }).error.code, 'NOT_PAUSED');
+});
+test('encerrar antecipado: precisa dos 4 sim; um não cancela', () => {
+  let s = fresh(); s.scores = { A: 500, B: 300 };
+  s = must(play(s, { type: 'PROPOSE_END', player: 0 }));
+  s = must(play(s, { type: 'VOTE_END', player: 1, yes: true }));
+  s = must(play(s, { type: 'VOTE_END', player: 2, yes: false }));
+  assert.strictEqual(s.endVote, null);
+  s = must(play(s, { type: 'PROPOSE_END', player: 1 }));
+  [0, 2, 3].forEach((p) => { s = must(play(s, { type: 'VOTE_END', player: p, yes: true })); });
+  assert.strictEqual(s.phase, 'GAME_OVER');
+  assert.strictEqual(s.winner, 'A');
+  assert.strictEqual(s.roundResult.reason, 'EARLY');
+});
+test('encerrar antecipado empatado: sem vencedor; END_NOW encerra direto', () => {
+  let s = fresh();
+  s = must(play(s, { type: 'END_NOW', player: 0 }));
+  assert.strictEqual(s.phase, 'GAME_OVER');
+  assert.strictEqual(s.winner, null);
+});
+test('adicionar várias cartas de uma vez ao mesmo jogo', () => {
+  let s = fresh();
+  const m = addMeld(s, 'A', '3S 4S 5S');
+  s.turn.player = 0; s.phase = 'PLAYING';
+  s.players[0].hand = K('6S 7S 8S 9H');
+  const c = s.players[0].hand;
+  s = must(play(s, { type: 'ADD_MANY', player: 0, meldId: m.id, cardIds: [c[2].id, c[0].id, c[1].id] }));
+  assert.strictEqual(s.teams.A.melds[0].cards.length, 6);
+  assert.strictEqual(s.players[0].hand.length, 1);
+});
+test('várias cartas: se uma não encaixa, nada é aplicado', () => {
+  let s = fresh();
+  const m = addMeld(s, 'A', '3S 4S 5S');
+  s.turn.player = 0; s.phase = 'PLAYING';
+  s.players[0].hand = K('6S 9D 9H');
+  const c = s.players[0].hand;
+  const r = play(s, { type: 'ADD_MANY', player: 0, meldId: m.id, cardIds: [c[0].id, c[1].id] });
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(s.teams.A.melds[0].cards.length, 3);
 });
 
 console.log(`\n${passed} passaram, ${failed} falharam`);
