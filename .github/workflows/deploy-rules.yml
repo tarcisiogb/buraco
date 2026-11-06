@@ -24,14 +24,28 @@ jobs:
           test -n "$SA_JSON" || { echo "Secret FIREBASE_SERVICE_ACCOUNT nao configurado"; exit 1; }
           printf '%s' "$SA_JSON" > "$RUNNER_TEMP/sa.json"
           python3 - <<'PY'
-          import json, os, sys
+          import json, os, sys, base64
           f = os.path.join(os.environ["RUNNER_TEMP"], "sa.json")
-          try:
-              d = json.load(open(f))
-              print("::notice title=Chave lida::type=%s email=%s project=%s tem_private_key=%s" % (d.get("type"), d.get("client_email"), d.get("project_id"), bool(d.get("private_key"))))
-          except Exception as e:
-              print("::error title=Secret invalido::nao e um JSON valido (%s). Cole o conteudo INTEIRO do arquivo, de { ate }." % type(e).__name__)
+          raw = open(f, encoding="utf-8", errors="replace").read()
+          print("::notice title=Diagnostico do secret::caracteres=%d linhas=%d primeiro_char=%r ultimo_char=%r" % (len(raw), raw.count("\n") + 1, raw.strip()[:1], raw.strip()[-1:]))
+          cands = [raw.strip()]
+          t = raw.strip().strip("\u201c\u201d\"'").strip()
+          cands.append(t)
+          try: cands.append(base64.b64decode(raw.strip()).decode("utf-8"))
+          except Exception: pass
+          d = None
+          for c in cands:
+              try:
+                  d = json.loads(c)
+                  if isinstance(d, str): d = json.loads(d)
+                  if isinstance(d, dict):
+                      open(f, "w", encoding="utf-8").write(json.dumps(d)); break
+              except Exception:
+                  d = None
+          if not isinstance(d, dict):
+              print("::error title=Secret invalido::nao e um JSON valido. Veja o diagnostico acima (caracteres/linhas/primeiro e ultimo caractere).")
               sys.exit(1)
+          print("::notice title=Chave lida::type=%s email=%s project=%s tem_private_key=%s" % (d.get("type"), d.get("client_email"), d.get("project_id"), bool(d.get("private_key"))))
           PY
       - name: Publicar firestore.rules
         env:
