@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buraco da Família</title>
+<meta name="description" content="Buraco online para jogar em família.">
+<meta name="theme-color" content="#0f3d2e">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#0f3d2e; --felt-deep:#0b2e22; --felt-soft:#e8f1ec; --paper:#f5f3ec; --ink:#14231c;
+  --ink-soft:#5d6b63; --line:#e1e5de; --gold:#c9a13b; --gold-soft:#fbf3dc; --red:#b23a2e; --red-soft:#fbe9e7;
+  --ok:#1f7a44; --shadow:0 10px 30px rgba(10,40,28,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--paper);color:var(--ink)}
+body{font-family:'Inter',system-ui,sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+button,input,select{font-family:inherit;font-size:16px}
+:focus-visible{outline:2.5px solid var(--gold);outline-offset:2px;border-radius:8px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+img{max-width:100%}
+.wrap{max-width:920px;margin:0 auto;padding:0 16px 80px}
+.wrap.auth{max-width:440px;padding-top:28px}
+.brand{text-align:center;margin:8px 0 22px}
+.brand .logo{width:72px;height:72px;border-radius:20px;background:var(--felt);color:#f4efe0;display:inline-grid;place-items:center;font-size:44px;box-shadow:var(--shadow);border:2px solid var(--gold)}
+.brand h1{font-family:'Archivo',sans-serif;font-weight:900;font-size:28px;margin-top:12px;letter-spacing:-.5px}
+.brand p{color:var(--ink-soft);margin-top:4px;font-size:15px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:14px;box-shadow:var(--shadow)}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+.ph{font-family:'Archivo',sans-serif;font-weight:800;font-size:21px;margin-top:2px}
+.muted{color:var(--ink-soft);font-size:14px;line-height:1.45}
+label.f{display:block;margin-top:14px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.in{width:100%;margin-top:6px;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
+.in:focus{border-color:var(--felt);outline:none}
+.in[readonly]{background:#f3f4f1;color:var(--ink-soft)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;border:0;border-radius:12px;background:var(--felt);color:#fff;font-weight:700;cursor:pointer;width:100%;margin-top:16px}
+.btn:hover{background:var(--felt-deep)}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn.ghost:hover{background:var(--felt-soft)}
+.btn.gold{background:var(--gold);color:#241a02}
+.btn.danger{background:var(--red)}
+.btn.small,.btn.mini{width:auto;min-height:36px;padding:0 12px;font-size:14px;margin-top:0}
+.btn.mini{min-height:32px;padding:0 10px;font-size:13px}
+.btn.ok{background:var(--ok)}
+.link{background:none;border:0;color:var(--felt);font-weight:600;cursor:pointer;text-decoration:underline;font-size:14px}
+.tabs{display:flex;gap:6px;margin:16px 0 0;overflow-x:auto}
+.tab{flex:1;min-width:max-content;padding:10px 14px;border-radius:12px;border:1.5px solid var(--line);background:#fff;font-weight:700;color:var(--ink-soft);cursor:pointer;position:relative}
+.tab.on{background:var(--felt);color:#fff;border-color:var(--felt)}
+@media(hover:hover){.tab:not(.on):hover{background:var(--felt-soft)}}
+.dot{position:absolute;top:6px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--red)}
+.msg{padding:11px 14px;border-radius:12px;margin-top:14px;font-size:14px;line-height:1.4}
+.msg.err{background:var(--red-soft);color:#7a1f16}
+.msg.ok{background:var(--felt-soft);color:#0d4a2c}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 4px;gap:10px}
+.topbar .who{display:flex;align-items:center;gap:10px;min-width:0}
+.topbar .name{font-weight:700;line-height:1.1}
+.topbar .sub{font-size:12px;color:var(--ink-soft)}
+.av{width:44px;height:44px;border-radius:50%;background:var(--felt);color:#f4efe0;display:grid;place-items:center;font-weight:800;overflow:hidden;flex:none;border:2px solid var(--gold);cursor:pointer}
+.av img{width:100%;height:100%;object-fit:cover}
+.av.sm{width:38px;height:38px;font-size:14px}
+.row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.row:first-child,.ph + .row{border-top:0}
+.row .grow{flex:1;min-width:0}
+.row .t{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .s{font-size:13px;color:var(--ink-soft)}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--felt-soft);color:var(--felt)}
+.badge.m{background:var(--gold-soft);color:#7a5a06}
+.badge.p{background:var(--red-soft);color:var(--red)}
+.photoedit{display:flex;align-items:center;gap:14px;margin-top:14px}
+.photobig{width:84px;height:84px;border-radius:50%;background:var(--felt);color:#f4efe0;display:grid;place-items:center;font-size:28px;font-weight:800;overflow:hidden;border:3px solid var(--gold)}
+.photobig img{width:100%;height:100%;object-fit:cover}
+.modalbg{position:fixed;inset:0;background:rgba(5,25,17,.65);display:grid;place-items:center;padding:18px;z-index:50}
+.modal{background:#fff;border-radius:20px;padding:22px;max-width:360px;width:100%;text-align:center}
+.modal .big{width:200px;height:200px;border-radius:50%;margin:0 auto 14px;background:var(--felt);color:#f4efe0;display:grid;place-items:center;font-size:64px;font-weight:800;overflow:hidden;border:4px solid var(--gold)}
+.modal .big img{width:100%;height:100%;object-fit:cover}
+.modal h3{font-family:'Archivo',sans-serif;font-weight:800;font-size:22px}
+.soon{display:grid;place-items:center;text-align:center;padding:26px 10px;border:2px dashed var(--line);border-radius:16px;margin-top:12px;color:var(--ink-soft)}
+.soon .big{font-size:40px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stat{background:var(--felt-soft);border-radius:14px;padding:12px 6px;text-align:center}
+.stat b{display:block;font-family:'Archivo',sans-serif;font-size:22px}
+.stat span{font-size:12px;color:var(--ink-soft)}
+.build{text-align:center;font-size:11px;color:#9aa59e;margin-top:26px}
+.loading{display:grid;place-items:center;min-height:60vh;color:var(--ink-soft);text-align:center;gap:10px}
+.spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--felt);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.or{display:flex;align-items:center;gap:10px;margin:16px 0 0;color:var(--ink-soft);font-size:13px}
+.or:before,.or:after{content:"";flex:1;height:1px;background:var(--line)}
+.gbtn{background:#fff;color:var(--ink);border:1.5px solid var(--line);margin-top:12px}
+.gbtn:hover{background:#f6f6f3}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading"><div><div class="spin"></div><p style="margin-top:12px">Carregando…</p></div></div></div>
+<input id="fotoInput" type="file" accept="image/*" style="position:fixed;left:-9999px">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+"use strict";
+var BUILD = "2026-11-06a";
+
+var firebaseConfig = {
+  apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
+  authDomain: "buraco-c454c.firebaseapp.com",
+  projectId: "buraco-c454c",
+  storageBucket: "buraco-c454c.firebasestorage.app",
+  messagingSenderId: "23866851643",
+  appId: "1:23866851643:web:fb18b697d58d979f6cb71e"
+};
+
+var auth = null, db = null, FB = false;
+try {
+  if (typeof firebase !== "undefined" && firebase.initializeApp) {
+    firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.firestore(); FB = true;
+  }
+} catch (e) { FB = false; }
+
+/* ───────── Estado ───────── */
+var S = {
+  user: null,          // firebase user
+  me: null,            // doc jogadores/{uid} + id
+  meLoaded: false,
+  players: [],         // todos (master) ou aprovados
+  tab: "inicio",
+  authTab: "login",
+  registering: false,
+  msg: null,           // {tipo:'ok'|'err', txt}
+  form: {},            // campos digitados
+  edit: null,          // edicao do perfil
+  modal: null,         // jogador ampliado
+  busy: false
+};
+var unsubMe = null, unsubPlayers = null;
+
+/* ───────── Utilitários ───────── */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function val(id){ var el = $(id); return el ? el.value : ""; }
+function initials(n){ var p = String(n||"?").trim().split(/\s+/); return ((p[0]||"?")[0] + (p.length>1 ? p[p.length-1][0] : "")).toUpperCase(); }
+function primeiro(n){ return String(n||"").trim().split(/\s+/)[0] || ""; }
+function nomeExib(p){ var a = (p.apelido||"").trim(), f = primeiro(p.nome); if(a && f && a.toLowerCase()!==f.toLowerCase()) return a + " · " + f; return a || f || "—"; }
+function porApelido(a,b){ return (a.apelido||a.nome||"").localeCompare(b.apelido||b.nome||"","pt-BR"); }
+function avatar(p, cls){ return '<div class="av '+(cls||"")+'" data-action="zoom" data-id="'+esc(p.id)+'">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':esc(initials(p.nome)))+'</div>'; }
+function isMaster(){ return !!S.me && S.me.role === "master" && S.me.status === "aprovado"; }
+function fbAuthErr(e){
+  var m = {
+    "auth/invalid-email":"E-mail inválido.",
+    "auth/user-not-found":"E-mail ou senha incorretos.",
+    "auth/wrong-password":"E-mail ou senha incorretos.",
+    "auth/invalid-credential":"E-mail ou senha incorretos.",
+    "auth/invalid-login-credentials":"E-mail ou senha incorretos.",
+    "auth/email-already-in-use":"Já existe um cadastro com esse e-mail.",
+    "auth/weak-password":"Escolha uma senha com pelo menos 6 caracteres.",
+    "auth/too-many-requests":"Muitas tentativas. Aguarde um pouco e tente de novo.",
+    "auth/network-request-failed":"Sem conexão. Verifique sua internet.",
+    "auth/popup-closed-by-user":"A janela do Google foi fechada antes de concluir.",
+    "auth/cancelled-popup-request":"A janela do Google foi fechada antes de concluir.",
+    "auth/popup-blocked":"O navegador bloqueou a janela do Google. Libere pop-ups e tente de novo.",
+    "auth/unauthorized-domain":"Este endereço ainda não está autorizado no Firebase.",
+    "auth/requires-recent-login":"Por segurança, entre de novo e repita a operação.",
+    "permission-denied":"Sem permissão para essa operação."
+  };
+  var c = e && (e.code || ""); return m[c] || ("Algo deu errado. " + (c || (e && e.message) || ""));
+}
+function setMsg(tipo, txt){ S.msg = txt ? {tipo:tipo, txt:txt} : null; }
+function msgHtml(){ if(!S.msg) return ""; var h = '<div class="msg '+S.msg.tipo+'" role="alert">'+esc(S.msg.txt)+'</div>'; return h; }
+
+/* ───────── Listeners ───────── */
+function stopListeners(){ if(unsubMe){ unsubMe(); unsubMe = null; } if(unsubPlayers){ unsubPlayers(); unsubPlayers = null; } }
+function listenPlayers(){
+  if(unsubPlayers) return;
+  var q = db.collection("jogadores");
+  if(!isMaster()) q = q.where("status","==","aprovado");
+  unsubPlayers = q.onSnapshot(function(snap){
+    S.players = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
+    render();
+  }, function(){ /* sem permissao ainda */ });
+}
+function listenMe(uid){
+  stopListeners(); S.meLoaded = false; S.me = null;
+  unsubMe = db.collection("jogadores").doc(uid).onSnapshot(function(d){
+    S.meLoaded = true;
+    if(!d.exists){ S.me = null; render(); return; }
+    S.me = d.data(); S.me.id = d.id;
+    if(S.me.status === "aprovado"){
+      if(unsubPlayers && isMaster() !== S._masterListen){ unsubPlayers(); unsubPlayers = null; }
+      S._masterListen = isMaster(); listenPlayers();
+    }
+    render();
+  }, function(){ S.meLoaded = true; S.me = null; render(); });
+}
+
+if(FB){
+  auth.onAuthStateChanged(function(u){
+    if(S.registering) return;
+    S.user = u;
+    if(!u){ stopListeners(); S.me = null; S.meLoaded = true; S.players = []; render(); return; }
+    S.edit = null; S.tab = "inicio"; listenMe(u.uid); render();
+  });
+} else {
+  document.addEventListener("DOMContentLoaded", function(){ render(); });
+}
+
+/* ───────── Telas ───────── */
+function render(){
+  var app = $("app"); if(!app) return;
+  var active = document.activeElement;
+  if(active && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName) && active.id && S.user && S.me && S.me.status==="aprovado" && S.tab==="perfil" && !S._forceRender) return; // nao interrompe digitacao
+  S._forceRender = false;
+  var h;
+  if(!FB) h = viewOffline();
+  else if(!S.user && S.meLoaded === false && !S.registering && !S._authReady) { h = viewLoading(); }
+  else if(!S.user) h = viewAuth();
+  else if(!S.meLoaded) h = viewLoading();
+  else if(!S.me) h = viewComplete();
+  else if(S.me.status === "pendente") h = viewPending();
+  else if(S.me.status === "recusado") h = viewRefused();
+  else h = viewApp();
+  app.innerHTML = h + (S.modal ? modalHtml() : "") + '<div class="build">Buraco da Família · build '+BUILD+'</div>';
+}
+function viewLoading(){ return '<div class="loading"><div><div class="spin"></div><p style="margin-top:12px">Carregando…</p></div></div>'; }
+function viewOffline(){ return '<div class="wrap auth">'+brand()+'<div class="msg err">Não consegui carregar o Firebase. Verifique sua conexão e recarregue a página.</div><button class="btn" data-action="reload">Recarregar</button></div>'; }
+function brand(){ return '<div class="brand"><div class="logo">♠</div><h1>Buraco da Família</h1><p>Jogue em dupla com quem você ama</p></div>'; }
+
+function viewAuth(){
+  var f = S.form || {}, h = ['<div class="wrap auth">', brand(), '<div class="panel">'];
+  if(S.authTab === "login"){
+    h.push('<div class="eyebrow">Acesso</div><h2 class="ph">Entrar</h2>');
+    h.push('<label class="f">E-mail<input class="in" id="li_email" type="email" autocomplete="username" value="'+esc(f.li_email||"")+'"></label>');
+    h.push('<label class="f">Senha<input class="in" id="li_senha" type="password" autocomplete="current-password"></label>');
+    h.push(msgHtml());
+    h.push('<button class="btn" data-action="login"'+(S.busy?" disabled":"")+'>Entrar</button>');
+    h.push('<div class="or">ou</div><button class="btn gbtn" data-action="google">Entrar com Google</button>');
+    h.push('<div style="text-align:center;margin-top:14px"><button class="link" data-action="forgot">Esqueci minha senha</button></div>');
+    h.push('<div style="text-align:center;margin-top:8px" class="muted">Primeira vez? <button class="link" data-action="tab-reg">Criar cadastro</button></div>');
+  } else {
+    h.push('<div class="eyebrow">Novo por aqui</div><h2 class="ph">Criar cadastro</h2>');
+    h.push('<p class="muted" style="margin-top:6px">Depois de enviar, um administrador precisa aprovar seu acesso.</p>');
+    h.push(regFields(f, false));
+    h.push('<label class="f">Senha<input class="in" id="rg_senha" type="password" autocomplete="new-password"></label>');
+    h.push('<label class="f">Confirmar senha<input class="in" id="rg_senha2" type="password" autocomplete="new-password"></label>');
+    h.push(msgHtml());
+    h.push('<button class="btn" data-action="register"'+(S.busy?" disabled":"")+'>Enviar cadastro</button>');
+    h.push('<div class="or">ou</div><button class="btn gbtn" data-action="google">Cadastrar com Google</button>');
+    h.push('<div style="text-align:center;margin-top:12px" class="muted">Já tem cadastro? <button class="link" data-action="tab-login">Entrar</button></div>');
+  }
+  h.push('</div></div>');
+  return h.join("");
+}
+function regFields(f, emailLocked){
+  return '<label class="f">Nome completo<input class="in" id="rg_nome" autocomplete="name" value="'+esc(f.rg_nome||"")+'"></label>'+
+    '<label class="f">Apelido (como a família te chama)<input class="in" id="rg_apelido" value="'+esc(f.rg_apelido||"")+'"></label>'+
+    '<label class="f">Quem é você na família? (opcional)<input class="in" id="rg_relacao" placeholder="ex.: sogra, primo, cunhado" value="'+esc(f.rg_relacao||"")+'"></label>'+
+    '<label class="f">Telefone (opcional)<input class="in" id="rg_tel" type="tel" autocomplete="tel" value="'+esc(f.rg_tel||"")+'"></label>'+
+    '<label class="f">E-mail<input class="in" id="rg_email" type="email" autocomplete="email" '+(emailLocked?"readonly ":"")+'value="'+esc(f.rg_email||"")+'"></label>';
+}
+function viewComplete(){
+  var u = S.user, f = S.form || {};
+  if(f.rg_nome == null) f.rg_nome = u.displayName || "";
+  if(f.rg_apelido == null) f.rg_apelido = primeiro(u.displayName);
+  if(f.rg_email == null) f.rg_email = u.email || "";
+  S.form = f;
+  return '<div class="wrap auth">'+brand()+'<div class="panel"><div class="eyebrow">Quase lá</div><h2 class="ph">Complete seu cadastro</h2>'+
+    '<p class="muted" style="margin-top:6px">Entrou com '+esc(u.email||"Google")+'. Falta confirmar seus dados.</p>'+regFields(f, true)+msgHtml()+
+    '<button class="btn" data-action="complete"'+(S.busy?" disabled":"")+'>Enviar cadastro</button>'+
+    '<div style="text-align:center;margin-top:12px"><button class="link" data-action="logout">Sair</button></div></div></div>';
+}
+function viewPending(){
+  return '<div class="wrap auth">'+brand()+'<div class="panel" style="text-align:center"><div style="font-size:40px">⏳</div><h2 class="ph">Aguardando aprovação</h2>'+
+    '<p class="muted" style="margin-top:8px">Seu cadastro foi enviado, '+esc(primeiro(S.me.nome))+'. Assim que o administrador aprovar, você já entra na mesa. Pode fechar esta tela e voltar depois.</p>'+
+    '<button class="btn ghost" data-action="logout">Sair</button></div></div>';
+}
+function viewRefused(){
+  return '<div class="wrap auth">'+brand()+'<div class="panel" style="text-align:center"><h2 class="ph">Cadastro não aprovado</h2>'+
+    '<p class="muted" style="margin-top:8px">Fale com o administrador da família.</p><button class="btn ghost" data-action="logout">Sair</button></div></div>';
+}
+
+/* App aprovado */
+function viewApp(){
+  var pend = isMaster() ? S.players.filter(function(p){ return p.status === "pendente"; }).length : 0;
+  var h = ['<div class="wrap">'];
+  h.push('<div class="topbar"><div class="who">'+avatar(S.me)+'<div><div class="name">'+esc(nomeExib(S.me))+'</div><div class="sub">'+(isMaster()?"Master":"Jogador")+'</div></div></div><button class="btn ghost small" data-action="logout">Sair</button></div>');
+  h.push('<div class="tabs" role="tablist">');
+  h.push(tabBtn("inicio","Início")); h.push(tabBtn("perfil","Meu cadastro"));
+  if(isMaster()) h.push(tabBtn("admin","Administração", pend));
+  h.push('</div>');
+  if(S.tab === "perfil") h.push(viewPerfil());
+  else if(S.tab === "admin" && isMaster()) h.push(viewAdmin());
+  else h.push(viewInicio());
+  h.push('</div>');
+  return h.join("");
+}
+function tabBtn(id, label, dot){ return '<button class="tab'+(S.tab===id?" on":"")+'" role="tab" data-action="tab" data-id="'+id+'">'+label+(dot?'<span class="dot"></span>':"")+'</button>'; }
+
+function viewInicio(){
+  var ap = S.players.filter(function(p){ return p.status === "aprovado"; }).sort(porApelido);
+  var h = ['<div class="panel"><div class="eyebrow">Mesas</div><h2 class="ph">Vamos jogar?</h2>',
+    '<div class="soon"><div class="big">🃏</div><b style="margin-top:6px;color:var(--ink)">As mesas de jogo chegam na próxima etapa</b><span style="margin-top:4px">O motor de regras já está pronto e testado.</span></div></div>'];
+  h.push('<div class="panel"><div class="eyebrow">Família</div><h2 class="ph">Quem está por aqui</h2>');
+  if(!ap.length) h.push('<p class="muted" style="margin-top:8px">Carregando…</p>');
+  ap.forEach(function(p){
+    h.push('<div class="row">'+avatar(p,"sm")+'<div class="grow"><div class="t">'+esc(nomeExib(p))+'</div>'+(p.relacao?'<div class="s">'+esc(p.relacao)+'</div>':"")+'</div>'+(p.role==="master"?'<span class="badge m">Master</span>':"")+'</div>');
+  });
+  h.push('</div>');
+  return h.join("");
+}
+
+function ensureEdit(){
+  if(!S.edit || S.edit._id !== S.me.id){
+    S.edit = { _id:S.me.id, nome:S.me.nome||"", apelido:S.me.apelido||"", relacao:S.me.relacao||"", tel:S.me.telefone||"" };
+  }
+  return S.edit;
+}
+function viewPerfil(){
+  var e = ensureEdit(), u = S.user, usaSenha = (u.providerData||[]).some(function(p){ return p.providerId === "password"; });
+  var h = ['<div class="panel"><div class="eyebrow">Perfil</div><h2 class="ph">Meu cadastro</h2>'];
+  h.push('<div class="photoedit"><div class="photobig">'+(S.me.foto?'<img src="'+esc(S.me.foto)+'" alt="">':esc(initials(e.nome)))+'</div><div>'+
+    '<button class="btn ghost small" data-action="pick-foto">'+(S.me.foto?"Trocar foto":"Adicionar foto")+'</button>'+
+    (S.me.foto?' <button class="btn ghost small" data-action="rem-foto">Remover</button>':"")+'<div class="muted" style="margin-top:6px">A foto é salva na hora.</div></div></div>');
+  h.push('<label class="f">Nome completo<input class="in" id="pf_nome" value="'+esc(e.nome)+'"></label>');
+  h.push('<label class="f">Apelido<input class="in" id="pf_apelido" value="'+esc(e.apelido)+'"></label>');
+  h.push('<label class="f">Quem é você na família?<input class="in" id="pf_relacao" value="'+esc(e.relacao)+'"></label>');
+  h.push('<label class="f">Telefone<input class="in" id="pf_tel" type="tel" value="'+esc(e.tel)+'"></label>');
+  h.push('<label class="f">E-mail (login)<input class="in" value="'+esc(S.me.email||u.email||"")+'" readonly></label>');
+  h.push(S.tab==="perfil" && S.msg ? msgHtml() : "");
+  h.push('<button class="btn" data-action="save-perfil">Salvar</button></div>');
+  h.push('<div class="panel"><div class="eyebrow">Segurança</div><h2 class="ph">Senha</h2>');
+  if(usaSenha){
+    h.push('<label class="f">Senha atual<input class="in" id="pw_atual" type="password" autocomplete="current-password"></label>');
+    h.push('<label class="f">Nova senha<input class="in" id="pw_nova" type="password" autocomplete="new-password"></label>');
+    h.push('<label class="f">Confirmar nova senha<input class="in" id="pw_conf" type="password" autocomplete="new-password"></label>');
+    h.push('<button class="btn ghost" data-action="change-pass">Trocar senha</button>');
+  } else {
+    h.push('<p class="muted" style="margin-top:6px">Sua conta usa o login do Google, então não há senha para trocar aqui.</p>');
+  }
+  h.push('</div>');
+  h.push('<div class="panel"><div class="eyebrow">Jogos</div><h2 class="ph">Minhas estatísticas</h2><div class="stats"><div class="stat"><b>0</b><span>Partidas</span></div><div class="stat"><b>0</b><span>Vitórias</span></div><div class="stat"><b>0</b><span>Pontos</span></div></div><p class="muted" style="margin-top:10px">As estatísticas começam a contar quando as mesas abrirem.</p></div>');
+  return h.join("");
+}
+
+function viewAdmin(){
+  var pend = S.players.filter(function(p){ return p.status === "pendente"; }).sort(porApelido);
+  var elenco = S.players.filter(function(p){ return p.status !== "pendente"; }).sort(porApelido);
+  var h = ['<div class="panel"><div class="eyebrow">Fila de acesso</div><h2 class="ph">Aprovações pendentes <span class="badge p">'+pend.length+'</span></h2>'];
+  if(!pend.length) h.push('<p class="muted" style="margin-top:8px">Ninguém esperando aprovação.</p>');
+  pend.forEach(function(p){ h.push(playerRow(p, true)); });
+  h.push('</div>');
+  h.push(S.tab==="admin" && S.msg ? msgHtml() : "");
+  h.push('<div class="panel"><div class="eyebrow">Elenco</div><h2 class="ph">Jogadores <span class="badge">'+elenco.length+'</span></h2>');
+  elenco.forEach(function(p){ h.push(playerRow(p, false)); });
+  h.push('</div>');
+  return h.join("");
+}
+function playerRow(p, pend){
+  var acts = '';
+  if(pend) acts = '<button class="btn mini ok" data-action="approve" data-id="'+p.id+'">Aprovar</button> <button class="btn mini danger" data-action="reject" data-id="'+p.id+'">Recusar</button>';
+  else if(p.id !== S.me.id){
+    acts = (p.status==="recusado" ? '<button class="btn mini ok" data-action="approve" data-id="'+p.id+'">Aprovar</button> ' : '')+
+      '<button class="btn mini ghost" data-action="reset-link" data-id="'+p.id+'">Redefinir senha</button> <button class="btn mini danger" data-action="remove" data-id="'+p.id+'">Remover</button>';
+  }
+  return '<div class="row" style="align-items:flex-start">'+avatar(p,"sm")+'<div class="grow"><div class="t">'+esc(p.nome||"—")+(p.apelido?' <span class="muted">('+esc(p.apelido)+')</span>':"")+'</div>'+
+    '<div class="s">'+esc(p.email||"")+(p.relacao?' · '+esc(p.relacao):"")+(p.telefone?' · '+esc(p.telefone):"")+'</div>'+
+    (p.status==="recusado"?'<span class="badge p">Recusado</span> ':"")+(p.role==="master"?'<span class="badge m">Master</span>':"")+
+    (acts?'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+acts+'</div>':"")+'</div></div>';
+}
+function modalHtml(){
+  var p = S.modal;
+  return '<div class="modalbg" data-action="close-modal"><div class="modal" data-stop="1"><div class="big">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':esc(initials(p.nome)))+'</div>'+
+    '<h3>'+esc(p.apelido||primeiro(p.nome))+'</h3><div class="muted">'+esc(p.nome||"")+'</div>'+(p.relacao?'<div class="muted" style="margin-top:4px">'+esc(p.relacao)+'</div>':"")+
+    '<button class="btn ghost" data-action="close-modal">Fechar</button></div></div>';
+}
+
+/* ───────── Ações ───────── */
+function keepForm(){ // guarda o que foi digitado antes de re-renderizar
+  var ids = ["li_email","rg_nome","rg_apelido","rg_relacao","rg_tel","rg_email"], f = S.form || {};
+  ids.forEach(function(i){ if($(i)) f[i] = $(i).value; }); S.form = f;
+}
+function busy(v){ S.busy = v; S._forceRender = true; render(); }
+function dadosCadastro(){
+  var nome = val("rg_nome").trim(), ap = val("rg_apelido").trim();
+  if(nome.length < 3) return {erro:"Informe seu nome completo."};
+  if(!ap) return {erro:"Informe um apelido."};
+  return { nome:nome, apelido:ap, relacao:val("rg_relacao").trim(), telefone:val("rg_tel").trim() };
+}
+function docNovo(d, email, foto){
+  return { email:email, nome:d.nome, apelido:d.apelido, relacao:d.relacao||"", telefone:d.telefone||"", foto:foto||null, role:"jogador", status:"pendente", criadoEm:firebase.firestore.FieldValue.serverTimestamp() };
+}
+function doLogin(){
+  keepForm(); var em = val("li_email").trim(), se = val("li_senha");
+  if(!em || !se){ setMsg("err","Informe e-mail e senha."); render(); return; }
+  setMsg(); busy(true);
+  auth.signInWithEmailAndPassword(em, se).then(function(){ busy(false); }).catch(function(e){ S.busy=false; setMsg("err", fbAuthErr(e)); S._forceRender = true; render(); });
+}
+function doRegister(){
+  keepForm(); var d = dadosCadastro(), em = val("rg_email").trim(), s1 = val("rg_senha"), s2 = val("rg_senha2");
+  if(d.erro){ setMsg("err", d.erro); render(); return; }
+  if(!/^\S+@\S+\.\S+$/.test(em)){ setMsg("err","Informe um e-mail válido."); render(); return; }
+  if(s1.length < 6){ setMsg("err","A senha precisa ter pelo menos 6 caracteres."); render(); return; }
+  if(s1 !== s2){ setMsg("err","As senhas não conferem."); render(); return; }
+  setMsg(); S.registering = true; busy(true);
+  auth.createUserWithEmailAndPassword(em, s1)
+    .then(function(cred){ return db.collection("jogadores").doc(cred.user.uid).set(docNovo(d, em, null)); })
+    .then(function(){ S.registering = false; S.busy = false; S.form = {}; S.authTab = "login"; setMsg("ok","Cadastro enviado! Assim que o administrador aprovar, você entra."); return auth.signOut(); })
+    .catch(function(e){ S.registering = false; S.busy = false; setMsg("err", fbAuthErr(e)); S._forceRender = true; render(); });
+}
+function doComplete(){
+  keepForm(); var d = dadosCadastro(); if(d.erro){ setMsg("err", d.erro); render(); return; }
+  var u = S.user; setMsg(); busy(true);
+  db.collection("jogadores").doc(u.uid).set(docNovo(d, u.email || "", null))
+    .then(function(){ S.busy = false; S.form = {}; })
+    .catch(function(e){ S.busy = false; setMsg("err", fbAuthErr(e)); S._forceRender = true; render(); });
+}
+function doGoogle(){
+  keepForm(); setMsg();
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){ setMsg("err", fbAuthErr(e)); S._forceRender = true; render(); });
+}
+function doForgot(){
+  keepForm(); var em = val("li_email").trim();
+  if(!em){ setMsg("err","Digite seu e-mail acima e toque em “Esqueci minha senha”."); render(); return; }
+  auth.sendPasswordResetEmail(em).then(function(){ setMsg("ok","Enviamos um link para redefinir a senha em "+em+". Confira também o spam."); render(); })
+    .catch(function(e){ setMsg("err", fbAuthErr(e)); render(); });
+}
+function savePerfil(){
+  var e = ensureEdit(); e.nome = val("pf_nome").trim(); e.apelido = val("pf_apelido").trim(); e.relacao = val("pf_relacao").trim(); e.tel = val("pf_tel").trim();
+  if(e.nome.length < 3){ setMsg("err","Informe seu nome completo."); S._forceRender = true; render(); return; }
+  if(!e.apelido){ setMsg("err","Informe um apelido."); S._forceRender = true; render(); return; }
+  db.collection("jogadores").doc(S.me.id).update({ nome:e.nome, apelido:e.apelido, relacao:e.relacao, telefone:e.tel })
+    .then(function(){ setMsg("ok","Dados salvos."); S._forceRender = true; render(); })
+    .catch(function(er){ setMsg("err", fbAuthErr(er)); S._forceRender = true; render(); });
+}
+function changePass(){
+  var at = val("pw_atual"), nv = val("pw_nova"), cf = val("pw_conf");
+  if(!at){ setMsg("err","Digite a senha atual."); S._forceRender = true; render(); return; }
+  if(nv.length < 6){ setMsg("err","A nova senha precisa ter pelo menos 6 caracteres."); S._forceRender = true; render(); return; }
+  if(nv !== cf){ setMsg("err","A confirmação não confere."); S._forceRender = true; render(); return; }
+  var cred = firebase.auth.EmailAuthProvider.credential(S.user.email, at);
+  S.user.reauthenticateWithCredential(cred).then(function(){ return S.user.updatePassword(nv); })
+    .then(function(){ setMsg("ok","Senha alterada."); S._forceRender = true; render(); })
+    .catch(function(er){ setMsg("err", fbAuthErr(er)); S._forceRender = true; render(); });
+}
+function resizeToDataUrl(file, max, cb){
+  var r = new FileReader();
+  r.onload = function(){ var img = new Image(); img.onload = function(){
+    var w = img.width, h = img.height, s = Math.min(1, max / Math.max(w, h)); w = Math.round(w*s); h = Math.round(h*s);
+    var c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h);
+    cb(c.toDataURL("image/jpeg", 0.82));
+  }; img.onerror = function(){ cb(null); }; img.src = r.result; };
+  r.onerror = function(){ cb(null); }; r.readAsDataURL(file);
+}
+function setFoto(url){
+  db.collection("jogadores").doc(S.me.id).update({ foto:url }).catch(function(er){ setMsg("err", fbAuthErr(er)); S._forceRender = true; render(); });
+}
+function masterSet(id, patch, okTxt){
+  db.collection("jogadores").doc(id).update(patch).then(function(){ setMsg("ok", okTxt); S._forceRender = true; render(); })
+    .catch(function(er){ setMsg("err", fbAuthErr(er)); S._forceRender = true; render(); });
+}
+function playerById(id){ for(var i=0;i<S.players.length;i++) if(S.players[i].id===id) return S.players[i]; return null; }
+
+document.addEventListener("click", function(ev){
+  var el = ev.target.closest("[data-action]"); if(!el) return;
+  if(el.getAttribute("data-action") === "close-modal" && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
+  var act = el.getAttribute("data-action"), id = el.getAttribute("data-id");
+  switch(act){
+    case "reload": location.reload(); break;
+    case "tab": setMsg(); S.tab = id; S._forceRender = true; render(); break;
+    case "tab-reg": keepForm(); setMsg(); S.authTab = "reg"; render(); break;
+    case "tab-login": keepForm(); setMsg(); S.authTab = "login"; render(); break;
+    case "login": doLogin(); break;
+    case "register": doRegister(); break;
+    case "complete": doComplete(); break;
+    case "google": doGoogle(); break;
+    case "forgot": doForgot(); break;
+    case "logout": setMsg(); S.form = {}; auth.signOut(); break;
+    case "save-perfil": savePerfil(); break;
+    case "change-pass": changePass(); break;
+    case "pick-foto": $("fotoInput").click(); break;
+    case "rem-foto": setFoto(null); break;
+    case "zoom": var p = (S.me && S.me.id===id) ? S.me : playerById(id); if(p){ S.modal = p; S._forceRender = true; render(); } break;
+    case "close-modal": S.modal = null; S._forceRender = true; render(); break;
+    case "approve": masterSet(id, { status:"aprovado" }, "Cadastro aprovado."); break;
+    case "reject": masterSet(id, { status:"recusado" }, "Cadastro recusado."); break;
+    case "remove": var q = playerById(id); if(q && confirm("Remover "+(q.apelido||q.nome)+" da família? Ele(a) poderá pedir acesso de novo.")){ db.collection("jogadores").doc(id).delete().then(function(){ setMsg("ok","Jogador removido."); S._forceRender = true; render(); }).catch(function(er){ setMsg("err", fbAuthErr(er)); S._forceRender = true; render(); }); } break;
+    case "reset-link": var r = playerById(id); if(r && r.email){ auth.sendPasswordResetEmail(r.email).then(function(){ setMsg("ok","Link de redefinição enviado para "+r.email+"."); S._forceRender = true; render(); }).catch(function(er){ setMsg("err", fbAuthErr(er)); S._forceRender = true; render(); }); } break;
+  }
+});
+document.addEventListener("keydown", function(ev){
+  if(ev.key !== "Enter") return;
+  var id = ev.target && ev.target.id; if(!id) return;
+  if(id === "li_email" || id === "li_senha") doLogin();
+});
+$("fotoInput").addEventListener("change", function(ev){
+  var f = ev.target.files && ev.target.files[0]; ev.target.value = ""; if(!f || !S.me) return;
+  resizeToDataUrl(f, 320, function(url){ if(!url){ setMsg("err","Não consegui ler essa imagem."); S._forceRender = true; render(); return; } setFoto(url); });
+});
+document.addEventListener("visibilitychange", function(){ if(!document.hidden && !(document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName))){ S._forceRender = true; render(); } });
+setTimeout(function(){ S._authReady = true; render(); }, 4000);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// =====================================================================
+// BURACO DA FAMILIA — Regras do Firestore
+// jogadores: cadastro self-service (pendente) -> Master aprova.
+// Perfis: master | jogador.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn()  { return request.auth != null; }
+    function meDoc()     { return get(/databases/$(database)/documents/jogadores/$(request.auth.uid)).data; }
+    function isApproved(){ return signedIn() && meDoc().status == 'aprovado'; }
+    function isMaster()  { return signedIn() && meDoc().role == 'master' && meDoc().status == 'aprovado'; }
+
+    match /jogadores/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isApproved());
+
+      // Auto-cadastro: sempre pendente e perfil jogador.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.status == 'pendente'
+        && request.resource.data.role == 'jogador';
+
+      // O proprio jogador edita so os dados de perfil.
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['nome', 'apelido', 'telefone', 'foto', 'relacao']);
+
+      // Master aprova, recusa, edita e remove.
+      allow update, delete: if isMaster();
+    }
+  }
+}
