@@ -584,13 +584,13 @@
 
   function finishEarly(state, events) {
     const a = state.scores.A, b = state.scores.B;
-    state.winner = a > b ? 'A' : b > a ? 'B' : null;
+    state.winner = null; // encerramento antecipado cancela os pontos: não há vencedor
     state.phase = 'GAME_OVER';
     state.turn.deadline = null;
     state.paused = null;
     state.endVote = null;
     state.pendingRoundEnd = false;
-    state.roundResult = { reason: 'EARLY', by: null, detail: null, scoresAfter: { A: a, B: b } };
+    state.roundResult = { reason: 'EARLY', by: null, detail: null, cancelled: true, scoresAfter: { A: a, B: b } };
     events.push({ type: 'GAME_OVER', reason: 'EARLY', by: null, winner: state.winner, scores: { A: a, B: b } });
   }
 

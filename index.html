@@ -204,7 +204,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-engine.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-06d";
+var BUILD = "2026-11-06e";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -657,8 +657,8 @@ function mesasPanel(){
     var avs = ""; for(var i=0;i<4;i++){ var p = m.seats[i] ? playerByUid(m.seats[i]) : null; avs += p ? avatarMini(p) : '<div class="av empty">·</div>'; }
     var n = m.seats.filter(function(x){ return x; }).length;
     if(!any){ h.push('<div style="margin-top:16px" class="eyebrow">Mesas abertas</div>'); any = true; }
-    h.push('<div class="mesaitem"><div class="avs">'+avs+'</div><div class="grow" style="flex:1;min-width:0"><div style="font-weight:700">'+esc(m.nome||"Mesa")+'</div><div class="muted">'+(m.status==="jogando"?"Em andamento":n+"/4 jogadores")+'</div></div>'+
-      '<button class="btn small '+(mine&&m.status==="jogando"?"gold":"ghost")+'" data-action="mesa-abrir" data-id="'+m.id+'">'+(mine&&m.status==="jogando"?"Voltar ao jogo":(m.status==="jogando"?"Ver":"Entrar"))+'</button></div>');
+    h.push('<div class="mesaitem"><div class="avs">'+avs+'</div><div class="grow" style="flex:1;min-width:0"><div style="font-weight:700">'+esc(m.nome||"Mesa")+'</div><div class="muted">'+(m.status==="jogando"?(m.pausada?"⏸ Pausada — retome quando quiser":"Em andamento"):n+"/4 jogadores")+'</div></div>'+
+      '<button class="btn small '+(mine&&m.status==="jogando"?"gold":"ghost")+'" data-action="mesa-abrir" data-id="'+m.id+'">'+(mine&&m.status==="jogando"?(m.pausada?"Retomar":"Voltar ao jogo"):(m.status==="jogando"?"Ver":"Entrar"))+'</button></div>');
   });
   if(!any) h.push('<p class="muted" style="margin-top:14px">Nenhuma mesa aberta. Crie a primeira!</p>');
   h.push('</div>');
@@ -844,7 +844,7 @@ function doAct(action){
   }); }), 12000).then(function(res){
     S.sending = false;
     if(!res.ok){ toast("A jogada não foi aceita: " + res.error.message); resync(); }
-    else { S.game = res.state; S.gameV = res.v; if(res.state.phase === "GAME_OVER") mesasCol().doc(S.mesaId).update({ status:"encerrada" }).catch(function(){}); }
+    else { S.game = res.state; S.gameV = res.v; if(action.type === "PAUSE" || action.type === "RESUME") mesasCol().doc(S.mesaId).update({ pausada: action.type === "PAUSE" }).catch(function(){}); if(res.state.phase === "GAME_OVER") mesasCol().doc(S.mesaId).update({ status:"encerrada" }).catch(function(){}); }
     S._forceRender = true; render();
   }).catch(function(){ S.sending = false; toast("Sem conexão: jogada não enviada. Tentando sincronizar…"); S.gameV = 0; resync(); S._forceRender = true; render(); });
 }
@@ -974,7 +974,7 @@ function gameHtml(m, me){
   h.push('</div>');
   var out = h.join("");
   if(S.picker) out += pickerHtml();
-  if(g.paused && g.phase !== "GAME_OVER") out += '<div class="modalbg"><div class="modal"><div style="font-size:42px">⏸</div><h3>Jogo pausado</h3><p class="muted" style="margin-top:6px">'+esc(g.players[g.paused.by].name)+' pausou a partida.</p><button class="btn" data-action="g-resume">Continuar</button></div></div>';
+  if(g.paused && g.phase !== "GAME_OVER") out += '<div class="modalbg"><div class="modal"><div style="font-size:42px">⏸</div><h3>Jogo pausado</h3><p class="muted" style="margin-top:6px">'+esc(g.players[g.paused.by].name)+' pausou a partida.</p><button class="btn" data-action="g-resume">Continuar</button><button class="btn ghost" data-action="mesa-back">Sair e voltar depois</button><p class="muted" style="margin-top:8px;font-size:12px">A partida fica salva: dá para retomar em outro momento.</p></div></div>';
   if(S.menu) out += '<div class="modalbg" data-action="close-menu"><div class="modal wide" data-stop="1"><h3>Mais opções</h3><button class="btn ghost" data-action="g-propose-end"'+(g.endVote?" disabled":"")+'>Propor encerrar a partida</button>'+(canForceEnd(m)?'<button class="btn danger" data-action="g-end-now">Encerrar agora (administrador)</button>':"")+'<button class="btn ghost" data-action="close-menu">Fechar</button></div></div>';
   if(g.phase==="ROUND_OVER" || g.phase==="GAME_OVER") out += endHtml(g, team, opp);
   if(S.toast) out += '<div class="toast">'+esc(S.toast)+'</div>';
@@ -991,11 +991,11 @@ function pickerHtml(){
 }
 function endHtml(g, team, opp){
   var r = g.roundResult, over = g.phase === "GAME_OVER", win = g.winner === team, early = r.reason === "EARLY";
-  var title = over ? (early ? "Partida encerrada" : (win ? "🏆 Vitória!" : "Fim de jogo")) : "Fim da rodada";
-  var sub = early ? (g.winner ? (win ? "Vocês ficaram na frente! 🏆" : "A outra dupla ficou na frente.") : "Empate.") : (r.reason==="BATIDA" ? esc(g.players[r.by].name)+" bateu!" : "O monte acabou.");
+  var title = over ? (early ? "Partida cancelada" : (win ? "🏆 Vitória!" : "Fim de jogo")) : "Fim da rodada";
+  var sub = early ? "Encerrada antes da meta: os pontos foram cancelados e não há vencedor." : (r.reason==="BATIDA" ? esc(g.players[r.by].name)+" bateu!" : "O monte acabou.");
   var h = ['<div class="modalbg"><div class="modal wide"><h3>'+title+'</h3><p class="muted" style="margin-top:4px">'+sub+'</p>'];
-  h.push('<table class="tbl"><tr><th></th><th>Nós</th><th>Eles</th></tr>');
-  if(r.detail){
+  if(!early) h.push('<table class="tbl"><tr><th></th><th>Nós</th><th>Eles</th></tr>');
+  if(!early && r.detail){
     var d = r.detail;
     [["Morto","morto"],["Batida","batida"],["Cartas","cartas"]].forEach(function(x){ h.push('<tr><td>'+x[0]+'</td><td>'+d[team][x[1]]+'</td><td>'+d[opp][x[1]]+'</td></tr>'); });
     [["Canastra suja","suja"],["Canastra limpa","limpa"],["Canastra 500","c500"],["Canastra 1000","c1000"]].forEach(function(x){
@@ -1003,7 +1003,8 @@ function endHtml(g, team, opp){
     });
     h.push('<tr class="tot"><td>Rodada</td><td>'+d[team].total+'</td><td>'+d[opp].total+'</td></tr>');
   }
-  h.push('<tr class="tot"><td>Placar</td><td>'+r.scoresAfter[team]+'</td><td>'+r.scoresAfter[opp]+'</td></tr></table>');
+  if(!early) h.push('<tr class="tot"><td>Placar</td><td>'+r.scoresAfter[team]+'</td><td>'+r.scoresAfter[opp]+'</td></tr>');
+  if(!early) h.push('</table>');
   h.push(over ? '<button class="btn" data-action="mesa-back">Voltar às mesas</button>' : '<button class="btn" data-action="g-next">Próxima rodada</button>');
   h.push('</div></div>');
   return h.join("");

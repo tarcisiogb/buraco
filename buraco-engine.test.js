@@ -675,7 +675,7 @@ test('pausa bloqueia jogadas e retoma; relógio não corre durante a pausa', () 
 test('não retoma jogo que não está pausado', () => {
   assert.strictEqual(play(fresh(), { type: 'RESUME', player: 0 }).error.code, 'NOT_PAUSED');
 });
-test('encerrar antecipado: precisa dos 4 sim; um não cancela', () => {
+test('encerrar antecipado: precisa dos 4 sim; um não cancela a proposta', () => {
   let s = fresh(); s.scores = { A: 500, B: 300 };
   s = must(play(s, { type: 'PROPOSE_END', player: 0 }));
   s = must(play(s, { type: 'VOTE_END', player: 1, yes: true }));
@@ -684,10 +684,11 @@ test('encerrar antecipado: precisa dos 4 sim; um não cancela', () => {
   s = must(play(s, { type: 'PROPOSE_END', player: 1 }));
   [0, 2, 3].forEach((p) => { s = must(play(s, { type: 'VOTE_END', player: p, yes: true })); });
   assert.strictEqual(s.phase, 'GAME_OVER');
-  assert.strictEqual(s.winner, 'A');
+  assert.strictEqual(s.winner, null); // pontos cancelados
   assert.strictEqual(s.roundResult.reason, 'EARLY');
+  assert.strictEqual(s.roundResult.cancelled, true);
 });
-test('encerrar antecipado empatado: sem vencedor; END_NOW encerra direto', () => {
+test('END_NOW encerra direto, sem vencedor', () => {
   let s = fresh();
   s = must(play(s, { type: 'END_NOW', player: 0 }));
   assert.strictEqual(s.phase, 'GAME_OVER');

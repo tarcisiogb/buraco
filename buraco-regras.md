@@ -266,7 +266,7 @@ Não há pontos em aberto. Ao fechar o documento, assumi duas coisas que você n
 
 ## 13. PAUSA E ENCERRAMENTO ANTECIPADO
 
-- **Pausar:** qualquer um dos 4 jogadores pausa a partida. Enquanto estiver pausada, ninguém joga; qualquer jogador pode continuar. Se o relógio estiver ligado, ele não corre durante a pausa.
+- **Pausar:** qualquer um dos 4 jogadores pausa a partida. Enquanto estiver pausada, ninguém joga; qualquer jogador pode continuar. Se o relógio estiver ligado, ele não corre durante a pausa. A partida pausada fica salva e pode ser **retomada em outro momento** (inclusive dias depois); os jogadores podem sair e voltar à mesa.
 - **Encerrar a partida antes da meta:** qualquer jogador **propõe**; os **4 precisam aceitar**. Um "recusar" cancela a proposta. O administrador da mesa (criador ou Master) pode encerrar na hora.
-- **Placar do encerramento:** vale o placar acumulado das rodadas já terminadas (a rodada em andamento **não** conta). Vence a dupla com mais pontos; se igual, empate.
+- **Efeito do encerramento:** a partida é **cancelada** — todos os pontos são cancelados e **não há vencedor**.
 - **Adicionar várias cartas:** é possível selecionar várias cartas e tocar num jogo da dupla. Elas entram **uma por vez**, na ordem em que encaixarem; se alguma não encaixar, nenhuma é aplicada.
