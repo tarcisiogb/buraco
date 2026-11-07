@@ -265,6 +265,9 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .zoomwrap{display:flex;flex-wrap:wrap;gap:4px;--cw:34px}
 .zoomwrap .pc{height:calc(var(--cw)*1.2);overflow:hidden}
 .band .zoom{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:3px 9px;cursor:pointer;font-family:inherit}
+.hrow .pc{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none}
+.pc.dragging{opacity:.25}
+.ghostc{border:2px solid var(--gold)!important}
 </style>
 </head>
 <body>
@@ -278,7 +281,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07e";
+var BUILD = "2026-11-07f";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -1063,6 +1066,15 @@ function halfHtml(g, t, mine, tap){
   return '<div class="mhalf '+(t==="A"?"ta":"tb")+(mine?" us":" them")+'"><div class="mtitle"><span>'+(mine?"Nossos jogos":"Jogos deles")+' · '+ms.length+'</span>'+(ms.length?'<button class="zoom" data-action="zoom-melds" data-id="'+(mine?"us":"them")+'">⤢ ampliar</button>':"")+'</div><div class="meldwrap">'+ms.map(function(ml){ return meldHtml(ml, mine && tap); }).join("")+(ms.length?"":'<div class="mi" style="opacity:.6;font-size:11px">nenhum</div>')+'</div></div>';
 }
 function sortedHand(hand){
+  if(S.sortMode === "free"){
+    var byId = {}; hand.forEach(function(c){ byId[c.id] = c; });
+    var out = [], seen = {};
+    (S.order || []).forEach(function(id){ if(byId[id] && !seen[id]){ out.push(byId[id]); seen[id] = 1; } });
+    var rest = hand.filter(function(c){ return !seen[c.id]; });
+    var so0 = {S:0,H:1,C:2,D:3};
+    rest.sort(function(a,b){ return so0[a.suit]-so0[b.suit] || a.id-b.id; });
+    return out.concat(rest);
+  }
   var so = {S:0,H:1,C:2,D:3}, v = function(c){ return c.rank==="A"?1:c.rank==="J"?11:c.rank==="Q"?12:c.rank==="K"?13:parseInt(c.rank,10); };
   return hand.slice().sort(S.sortMode==="rank" ? function(a,b){ return v(a)-v(b) || so[a.suit]-so[b.suit] || a.id-b.id; } : function(a,b){ return so[a.suit]-so[b.suit] || v(a)-v(b) || a.id-b.id; });
 }
@@ -1135,9 +1147,13 @@ function gameHtml(m, me){
   if(myTurn && g.phase==="PLAYING"){
     h.push('<div class="acts"><button class="btn" data-action="g-lay"'+(S.sel.length>=3?"":" disabled")+'>Baixar jogo'+(S.sel.length>=3?" ("+S.sel.length+(vulOpen?" · "+selPts(g, me)+" pts":"")+")":"")+'</button>'+(g.opening?'<button class="btn ghost" data-action="g-undo">↩ Desfazer</button>':"")+'<button class="btn danger" data-action="g-throw"'+(S.sel.length===1?"":" disabled")+'>Descartar</button></div>');
   }
+  if(S.orderMesa !== S.mesaId || S.orderRound !== g.round){
+    S.orderMesa = S.mesaId; S.orderRound = g.round; S.order = [];
+    try{ var sv = JSON.parse(localStorage.getItem("buraco_order_" + S.mesaId) || "null"); if(sv && sv.r === g.round && sv.ids && sv.ids.length){ S.order = sv.ids; S.sortMode = "free"; } else if(S.sortMode === "free") S.sortMode = "suit"; }catch(e){ if(S.sortMode === "free") S.sortMode = "suit"; }
+  }
   var mine = sortedHand(g.players[me].hand), hn = now < S.newUntil ? S.newIds : [];
-  var hrows = rowsOf(mine, 15).map(function(r){ return '<div class="hrow">'+r.map(function(c){ var isNew = hn.indexOf(c.id) >= 0; return cardHtml(c, (S.sel.indexOf(c.id)>=0?"sel ":"")+(isNew?"new":""), 'data-action="g-sel" data-id="'+c.id+'"'); }).join("")+'</div>'; }).join("");
-  h.push('<div class="handwrap'+(myTurn?" mt":"")+'" id="handwrap"><div class="handhead"><span class="eyebrow">Sua mão · '+mine.length+'</span><button class="link" data-action="g-sort">Ordenar por '+(S.sortMode==="suit"?"número":"naipe")+'</button></div>'+hrows+'</div>');
+  var hrows = rowsOf(mine, 15).map(function(r){ return '<div class="hrow">'+r.map(function(c){ var isNew = hn.indexOf(c.id) >= 0; return cardHtml(c, (S.sel.indexOf(c.id)>=0?"sel ":"")+(isNew?"new ":"")+(S.dragId===c.id?"dragging":""), 'data-action="g-sel" data-id="'+c.id+'"'); }).join("")+'</div>'; }).join("");
+  h.push('<div class="handwrap'+(myTurn?" mt":"")+'" id="handwrap"><div class="handhead"><span class="eyebrow">Sua mão · '+mine.length+'</span><button class="link" data-action="g-sort">'+(S.sortMode==="free"?"Ordenar por naipe":"Ordenar por "+(S.sortMode==="suit"?"número":"naipe"))+'</button><span class="muted" style="font-size:10px">segure e arraste</span></div>'+hrows+'</div>');
   h.push('</div>');
   var out = h.join("");
   if(S.banner && now < S.banner.until) out += '<div class="banner '+S.banner.cls+'">'+esc(S.banner.txt)+'<small>'+esc(S.banner.sub)+'</small></div>';
@@ -1214,7 +1230,75 @@ setInterval(function(){
 }, 500);
 window.addEventListener("resize", function(){ if(S._inGame){ layoutFans(); fitMelds(); } });
 
+
+/* ── arrastar cartas da mão (segure ~0,3 s e arraste) ── */
+var DRAG = null;
+function dragStart(){
+  var g = S.game, m = S.lastMesa; if(!g || !m) return;
+  var me = mySeat(m); if(me < 0) return;
+  var el = DRAG.el, r = el.getBoundingClientRect(), gh = document.createElement("div");
+  gh.className = el.className.replace(/\bsel\b|\bnew\b|\bdragging\b/g, "") + " ghostc"; gh.innerHTML = el.innerHTML;
+  gh.style.cssText = "position:fixed;z-index:120;pointer-events:none;--cw:" + r.width + "px;left:" + (DRAG.x - r.width/2) + "px;top:" + (DRAG.y - r.width*1.5) + "px;transform:scale(1.15);box-shadow:0 12px 24px rgba(0,0,0,.45);height:" + (r.width*1.42) + "px;overflow:hidden";
+  document.body.appendChild(gh); DRAG.ghost = gh; DRAG.w = r.width; DRAG.on = true;
+  var bar = document.createElement("div"); bar.id = "dropbar"; bar.style.cssText = "position:fixed;z-index:119;width:4px;border-radius:2px;background:#f2c94c;box-shadow:0 0 8px #f2c94c;pointer-events:none;display:none";
+  document.body.appendChild(bar);
+  el.classList.add("dragging"); S.dragId = DRAG.id;
+  try{ if(navigator.vibrate) navigator.vibrate(15); }catch(e){}
+}
+function dragMove(x, y){
+  if(!DRAG || !DRAG.on) return;
+  DRAG.ghost.style.left = (x - DRAG.w/2) + "px"; DRAG.ghost.style.top = (y - DRAG.w*1.5) + "px";
+  var rows = document.querySelectorAll(".hrow"); if(!rows.length) return;
+  var best = 0, bd = 1e9;
+  for(var i=0;i<rows.length;i++){ var rr = rows[i].getBoundingClientRect(), d = Math.abs(y - (rr.top + rr.height/2)); if(d < bd){ bd = d; best = i; } }
+  var order = sortedHand(S.game.players[mySeat(S.lastMesa)].hand).map(function(c){ return c.id; });
+  var rest = order.filter(function(id){ return id !== DRAG.id; });
+  var count = 0; for(var k=0;k<best;k++){ count += rows[k].children.length - (rows[k].querySelector(".dragging") ? 1 : 0); }
+  var cs = [].filter.call(rows[best].children, function(c){ return !c.classList.contains("dragging"); }), idx = 0;
+  for(var j=0;j<cs.length;j++){
+    var rc = cs[j].getBoundingClientRect(), nx = cs[j+1] ? cs[j+1].getBoundingClientRect() : null;
+    var vis = nx ? Math.max(6, nx.left - rc.left) : rc.width;
+    if(x > rc.left + vis/2) idx = j + 1;
+  }
+  var target = Math.min(rest.length, count + idx);
+  rest.splice(target, 0, DRAG.id); DRAG.pending = rest;
+  var bar = document.getElementById("dropbar");
+  if(bar && cs.length){
+    var ref = idx < cs.length ? cs[idx].getBoundingClientRect() : cs[cs.length-1].getBoundingClientRect(), rowR = rows[best].getBoundingClientRect();
+    bar.style.display = "block"; bar.style.left = ((idx < cs.length ? ref.left : ref.right) - 2) + "px"; bar.style.top = (rowR.top + 6) + "px"; bar.style.height = (rowR.height - 4) + "px";
+  }
+}
+function dragEnd(){
+  if(!DRAG) return;
+  clearTimeout(DRAG.timer);
+  if(DRAG.on){
+    if(DRAG.ghost && DRAG.ghost.parentNode) DRAG.ghost.parentNode.removeChild(DRAG.ghost);
+    var bar = document.getElementById("dropbar"); if(bar && bar.parentNode) bar.parentNode.removeChild(bar);
+    S.dragId = null; S.noClickUntil = Date.now() + 450;
+    if(DRAG.pending){
+      S.order = DRAG.pending; S.sortMode = "free";
+      try{ localStorage.setItem("buraco_order_" + S.mesaId, JSON.stringify({ r:S.game.round, ids:S.order })); }catch(e){}
+    }
+    S._forceRender = true; render();
+  }
+  DRAG = null;
+}
+document.addEventListener("pointerdown", function(ev){
+  var el = ev.target.closest && ev.target.closest(".hrow .pc"); if(!el || ev.button > 0) return;
+  var id = parseInt(el.getAttribute("data-id"), 10); if(isNaN(id)) return;
+  DRAG = { id:id, el:el, x:ev.clientX, y:ev.clientY, sx:ev.clientX, sy:ev.clientY, on:false };
+  DRAG.timer = setTimeout(function(){ if(DRAG && !DRAG.on) dragStart(); }, 300);
+});
+document.addEventListener("pointermove", function(ev){
+  if(!DRAG) return; DRAG.x = ev.clientX; DRAG.y = ev.clientY;
+  if(!DRAG.on){ if(Math.abs(ev.clientX - DRAG.sx) > 12 || Math.abs(ev.clientY - DRAG.sy) > 12){ clearTimeout(DRAG.timer); DRAG = null; } return; }
+  ev.preventDefault(); dragMove(ev.clientX, ev.clientY);
+}, { passive:false });
+document.addEventListener("pointerup", dragEnd);
+document.addEventListener("pointercancel", dragEnd);
+window.addEventListener("pointerup", dragEnd);
 document.addEventListener("click", function(ev){
+  if(S.noClickUntil && Date.now() < S.noClickUntil && ev.target.closest && ev.target.closest(".hrow")){ ev.stopPropagation(); return; }
   var el = ev.target.closest("[data-action]"); if(!el) return;
   var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
   var act = el.getAttribute("data-action"), id = el.getAttribute("data-id");
@@ -1230,7 +1314,7 @@ document.addEventListener("click", function(ev){
     case "start-match": startMatch(); break;
     case "del-mesa": deleteMesa(); break;
     case "g-sel": var cid = parseInt(id,10), ix = S.sel.indexOf(cid); if(ix>=0) S.sel.splice(ix,1); else S.sel.push(cid); S._forceRender = true; render(); break;
-    case "g-sort": S.sortMode = S.sortMode==="suit" ? "rank" : "suit"; S._forceRender = true; render(); break;
+    case "g-sort": S.sortMode = (S.sortMode==="suit") ? "rank" : "suit"; S.order = []; try{ localStorage.removeItem("buraco_order_" + S.mesaId); }catch(e){} S._forceRender = true; render(); break;
     case "g-stock": tapStock(); break;
     case "g-discard": tapDiscard(); break;
     case "g-mute": MUTED = !MUTED; try{ localStorage.setItem("buraco_mute", MUTED ? "1" : "0"); }catch(e){} if(!MUTED){ unlockAudio(true); setTimeout(function(){ sfx("turn"); }, 120); } S._forceRender = true; render(); break;
