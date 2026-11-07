@@ -268,6 +268,9 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .hrow .pc{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none}
 .pc.dragging{opacity:.25}
 .ghostc{border:2px solid var(--gold)!important}
+.vulstrip{flex:none;background:#fde8e8;color:#8a1010;border:1.5px solid #e49a9a;border-radius:10px;padding:4px 9px;font-size:11.5px;line-height:1.25;text-align:center}
+.vulstrip.me{background:#c62828;color:#fff;border-color:#c62828;font-size:12.5px;animation:turnPulse 1.6s ease-in-out infinite}
+.banner.vul{background:linear-gradient(135deg,#b71c1c,#e53935)}
 </style>
 </head>
 <body>
@@ -281,7 +284,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07f";
+var BUILD = "2026-11-07g";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -898,6 +901,7 @@ function processLog(prev, g, me){
           }
         })();
         break;
+      case "ROUND_STARTED": (function(){ var vt = []; if(g.teams.A.vulnerable) vt.push("Dupla 1"); if(g.teams.B.vulnerable) vt.push("Dupla 2"); if(vt.length){ S.banner = { cls:"vul", txt:"⚠ VULNERÁVEL", sub:vt.join(" e ")+": a primeira descida precisa de "+g.config.openMin+" pontos", until:now + 3500 }; setTimeout(function(){ S._forceRender = true; render(); }, 3600); } })(); break;
       case "TEAM_OPENED": S.banner = { cls:"limpa", txt:"Dupla aberta!", sub:g.players[e.player].name+" · "+e.points+" pontos", until:now + 2000 }; sfx("canastra"); setTimeout(function(){ S._forceRender = true; render(); }, 2100); break;
       case "MORTO_EM_PE": case "MORTO_DESCARTE": case "MORTO_VIRA_MONTE": sfx("morto"); break;
       case "PAUSED": case "RESUMED": sfx("pause"); break;
@@ -936,7 +940,7 @@ function acceptRemote(d){
   var data = d.data(), v = data.v || 0;
   if(S.sending && v < (S.gameV || 0)) return;          // eco antigo durante o envio
   if(!S.sending && S.game && v === S.gameV) return;     // nada novo
-  var prev = S.game, g; try{ g = JSON.parse(data.json); }catch(e){ return; }
+  var prev = S.game, g; try{ g = E.normalize(JSON.parse(data.json)); }catch(e){ return; }
   var me = mySeat(S.lastMesa);
   if(v < (S.gameV || 0) && !S.sending && prev) return;
   S.game = g; S.gameV = v; cleanSel();
@@ -955,7 +959,7 @@ window.addEventListener("offline", function(){ S.offline = true; S._forceRender 
 function startGameListener(mid){
   stopGame(); gameFor = mid; S.lastN = null;
   unsubGame = estadoRef(mid).onSnapshot(function(d){
-    if(d.exists){ if(S.game === null){ try{ S.game = JSON.parse(d.data().json); S.gameV = d.data().v || 0; }catch(e){} var m0 = S.lastMesa, me0 = mySeat(m0); if(me0 >= 0 && S.game) processLog(null, S.game, me0); cleanSel(); render(); } else acceptRemote(d); }
+    if(d.exists){ if(S.game === null){ try{ S.game = E.normalize(JSON.parse(d.data().json)); S.gameV = d.data().v || 0; }catch(e){} var m0 = S.lastMesa, me0 = mySeat(m0); if(me0 >= 0 && S.game) processLog(null, S.game, me0); cleanSel(); render(); } else acceptRemote(d); }
     else render();
   }, function(){});
 }
@@ -1124,6 +1128,10 @@ function gameHtml(m, me){
   h.push('<div class="gtop"><button class="iconbtn" data-action="mesa-back" title="Voltar às mesas">‹</button><div class="score"><span class="sc me'+(g.teams[team].vulnerable?" vul":"")+'">Nós <b>'+g.scores[team]+'</b>'+(g.teams[team].vulnerable?' ⚠':"")+'</span><span class="sc'+(g.teams[opp].vulnerable?" vul":"")+'">Eles <b>'+g.scores[opp]+'</b>'+(g.teams[opp].vulnerable?' ⚠':"")+'</span></div>'+
     (S.offline?'<span class="badgeoff">offline</span>':"")+
     '<button class="iconbtn'+(MUTED?"":" on")+'" data-action="g-mute" title="Som">'+(MUTED?"🔇":"🔊")+'</button><button class="iconbtn" data-action="g-pause" title="Pausar">⏸</button><button class="iconbtn" data-action="g-menu" title="Mais">⋯</button></div>');
+  var vs = [];
+  if(g.teams[team].vulnerable) vs.push(g.teams[team].opened ? "Nós: aberta ✓" : "<b>NÓS VULNERÁVEIS</b>: primeira descida precisa de "+g.config.openMin+" pontos");
+  if(g.teams[opp].vulnerable) vs.push(g.teams[opp].opened ? "Eles: aberta ✓" : "<b>ELES VULNERÁVEIS</b> ("+g.config.openMin+" pts)");
+  if(vs.length && !(g.phase==="ROUND_OVER"||g.phase==="GAME_OVER")) h.push('<div class="vulstrip'+((g.teams[team].vulnerable && !g.teams[team].opened)?" me":"")+'">⚠ '+vs.join(" · ")+'</div>');
   if(g.endVote){
     var ev = g.endVote, voted = ev.yes.indexOf(me) >= 0;
     h.push('<div class="votebar"><span>'+esc(g.players[ev.by].name)+' propôs <b>encerrar a partida</b> ('+ev.yes.length+'/4 aceitaram)</span>'+(voted?'<span style="flex:none;opacity:.7">aguardando…</span>':'<button class="btn ok" data-action="vote-yes">Aceitar</button><button class="btn danger" data-action="vote-no">Recusar</button>')+(voted&&ev.by===me?'<button class="btn danger" data-action="vote-no">Cancelar</button>':"")+'</div>');

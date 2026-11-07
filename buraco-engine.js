@@ -836,8 +836,24 @@
     state.logSeq = n;
   }
 
+  /** Partidas salvas por versões antigas: completa a configuração e as marcas de vulnerável.
+   *  O placar só muda no fim da rodada, então o placar atual é o do início da rodada em andamento. */
+  function normalize(state) {
+    state.config = Object.assign({}, DEFAULT_CONFIG, state.config || {});
+    if (state.teams) {
+      for (const t of ['A', 'B']) {
+        const tm = state.teams[t];
+        if (tm && tm.vulnerable === undefined) {
+          tm.vulnerable = state.scores[t] >= state.config.vulnerableAt;
+          tm.opened = !tm.vulnerable || tm.melds.length > 0;
+        }
+      }
+    }
+    return state;
+  }
+
   function applyAction(state, action, now = Date.now()) {
-    const base = clone(state);
+    const base = normalize(clone(state));
     const events = processTimeouts(base, now);
     if (events.length) appendLog(base, events, now);
     const work = clone(base);
@@ -897,7 +913,7 @@
   return {
     RULES: DEFAULT_CONFIG,
     SUITS, RANKS, SUIT_SYMBOL,
-    createDeck, createGame, applyAction, processTimeouts,
+    createDeck, createGame, applyAction, processTimeouts, normalize,
     getMeldOptions, getAddOptions, viewFor,
     findMeldLayouts, findAddLayouts, meldInfo,
     cardPoints, cardLabel, scoreRound,

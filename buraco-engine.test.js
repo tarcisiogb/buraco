@@ -791,5 +791,16 @@ test('2 natural continua natural quando a carta encaixa sem buraco (2-3-4 + 5)',
   const opts = E.findAddLayouts(m, five);
   assert.strictEqual(opts[0].wilds, 0);
 });
+test('partida salva antes da regra: vira vulnerável pelo placar atual e exige os 75 pontos', () => {
+  const s = fresh({ config: { drawSeconds: 0, playSeconds: 0 } });
+  delete s.config.vulnerableAt; delete s.config.openMin;
+  s.teams.A = { melds: [], mortoTaken: false }; s.teams.B = { melds: [], mortoTaken: false };
+  s.scores = { A: 2940, B: 1335 };
+  s.players[0].hand = K('3S 4S 5S 9C 9D'); s.phase = 'PLAYING'; s.turn = { player: 0, deadline: null, drewFrom: 'STOCK' };
+  const r = must(play(s, { type: 'LAY_MELD', player: 0, cardIds: ids(s.players[0].hand.slice(0, 3)), option: 0 }));
+  assert.strictEqual(r.teams.A.vulnerable, true); assert.strictEqual(r.teams.B.vulnerable, false);
+  const d = play(r, { type: 'DISCARD', player: 0, cardId: s.players[0].hand[3].id });
+  assert.strictEqual(d.ok, false); assert.strictEqual(d.error.code, 'OPENING_INCOMPLETE');
+});
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);
