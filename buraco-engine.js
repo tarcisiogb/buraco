@@ -443,6 +443,15 @@
     return ok();
   }
 
+  /** Explica por que a dupla não pode esvaziar a mão agora (regra da última carta) */
+  function lastCardMsg(state, p) {
+    const team = state.teams[p.team];
+    let why = '';
+    if (!team.mortoTaken && state.mortos.length === 0) why = 'Sua dupla não pegou o morto e já não há morto: não dá para bater nesta rodada. ';
+    else if (team.mortoTaken && !hasCleanCanastra(team)) why = 'Sua dupla ainda não tem canastra limpa, então não pode bater. ';
+    return why + 'Você precisa ficar com ao menos 1 carta na mão.';
+  }
+
   /** Depois de baixar/adicionar: trata mão vazia e a regra da última carta (3.4) */
   function afterPlay(state, p, now, events) {
     if (p.hand.length === 0) {
@@ -456,11 +465,11 @@
         finishRound(state, 'BATIDA', p.id, events, now);
         return ok();
       }
-      return fail('LAST_CARD_RULE', 'Você precisa ficar com ao menos 1 carta na mão.');
+      return fail('LAST_CARD_RULE', lastCardMsg(state, p));
     }
     if (p.hand.length === 1 && emptyOutcome(state, p.id) === null) {
       // ficaria com 1 carta sem poder descartá-la (descartar o deixaria sem cartas)
-      return fail('LAST_CARD_RULE', 'Você precisa ficar com ao menos 1 carta na mão.');
+      return fail('LAST_CARD_RULE', lastCardMsg(state, p));
     }
     return ok();
   }
@@ -535,7 +544,7 @@
     if (!card) return fail('CARDS_NOT_IN_HAND', 'Carta não está na sua mão.');
     const emptying = p.hand.length === 1;
     const out = emptying ? emptyOutcome(state, p.id) : null;
-    if (emptying && out === null) return fail('LAST_CARD_RULE', 'Você precisa ficar com ao menos 1 carta na mão.');
+    if (emptying && out === null) return fail('LAST_CARD_RULE', lastCardMsg(state, p));
     p.hand = p.hand.filter((c) => c.id !== cardId);
     state.discard.push(card);
     events.push({ type: 'DISCARDED', player: p.id, card });
