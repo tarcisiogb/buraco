@@ -47,6 +47,8 @@
     targetScore: 3000,          // seção 8.4
     drawSeconds: 0,             // seção 10.1: 0 = sem limite de tempo (use 20 para o relógio de compra)
     playSeconds: 0,             // seção 10.1: 0 = sem limite de tempo (use 40 para o relógio de jogadas)
+    vulnerableAt: 1500,         // seção 8.5: a dupla com este placar (ou mais) começa a rodada vulnerável
+    openMin: 75,                // seção 8.5: pontos em cartas da primeira descida de uma dupla vulnerável
     batidaBonus: 100,           // seção 7.2: bônus de 100 para quem bate (ajustável)
     stockEmptyEnd: 'after_turn' // 'after_turn' | 'immediate' — quando a rodada acaba se o monte esgota sem morto (6.3.5)
   };
@@ -298,9 +300,10 @@
     state.stock = deck;
     state.discard = [];
     state.teams = {
-      A: { melds: [], mortoTaken: false },
-      B: { melds: [], mortoTaken: false }
+      A: { melds: [], mortoTaken: false, vulnerable: state.scores.A >= state.config.vulnerableAt, opened: !(state.scores.A >= state.config.vulnerableAt) },
+      B: { melds: [], mortoTaken: false, vulnerable: state.scores.B >= state.config.vulnerableAt, opened: !(state.scores.B >= state.config.vulnerableAt) }
     };
+    state.opening = null;
     state.pendingRoundEnd = false;
     state.roundResult = null;
     state.winner = null;
@@ -314,6 +317,46 @@
   function startTurn(state, player, now) {
     state.phase = 'WAITING_TURN';
     state.turn = { player, deadline: deadlineIn(state.config.drawSeconds, now), drewFrom: null };
+    state.opening = null;
+  }
+
+  // ───────────── Dupla vulnerável (seção 8.5) ─────────────
+
+  const needsOpening = (state, p) => { const t = state.teams[p.team]; return !!(t.vulnerable && !t.opened); };
+
+  /** Antes de baixar/adicionar: a mão não pode esvaziar antes de a dupla vulnerável somar os pontos */
+  function openingGuard(state, p, cards) {
+    if (!needsOpening(state, p)) return null;
+    const pts = cards.reduce((a, c) => a + cardPoints(c), 0);
+    const total = (state.opening ? state.opening.points : 0) + pts;
+    if (p.hand.length - cards.length === 0 && total < state.config.openMin) {
+      return fail('OPENING_INCOMPLETE', 'Dupla vulnerável: a primeira descida precisa somar ' + state.config.openMin + ' pontos (faltam ' + (state.config.openMin - total) + ').');
+    }
+    return null;
+  }
+  /** Depois de baixar/adicionar (com a mão ainda intacta no snapshot): soma os pontos e abre a dupla ao chegar no mínimo */
+  function openingBegin(state, p) {
+    if (needsOpening(state, p) && !state.opening) state.opening = { player: p.id, points: 0, hand: clone(p.hand) };
+  }
+  function openingCount(state, p, cards, events) {
+    if (!needsOpening(state, p) || !state.opening) return;
+    state.opening.points += cards.reduce((a, c) => a + cardPoints(c), 0);
+    if (state.opening.points >= state.config.openMin) {
+      events.push({ type: 'TEAM_OPENED', player: p.id, points: state.opening.points });
+      state.teams[p.team].opened = true;
+      state.opening = null;
+    }
+  }
+  function doUndoOpening(state, action, now, events) {
+    const c = checkTurn(state, action, 'PLAYING');
+    if (c) return c;
+    if (!state.opening) return fail('NO_OPENING', 'Não há descida para desfazer.');
+    const p = cur(state);
+    p.hand = state.opening.hand;
+    state.teams[p.team].melds = [];
+    state.opening = null;
+    events.push({ type: 'OPENING_UNDONE', player: p.id });
+    return ok();
   }
 
   const cur = (state) => state.players[state.turn.player];
@@ -422,10 +465,14 @@
     if (!layouts.length) return fail('INVALID_MELD', 'Essas cartas não formam um jogo válido.');
     const lay = layouts[action.option || 0];
     if (!lay) return fail('INVALID_OPTION', 'Opção de disposição inválida.');
+    const guard = openingGuard(state, p, cards);
+    if (guard) return guard;
+    openingBegin(state, p);
     p.hand = p.hand.filter((c) => !ids.includes(c.id));
     const meld = { id: state.nextMeldId++, suit: lay.suit, cards: lay.entries };
     state.teams[p.team].melds.push(meld);
     events.push({ type: 'MELD_LAID', player: p.id, meldId: meld.id, size: lay.size });
+    openingCount(state, p, cards, events);
     return afterPlay(state, p, now, events);
   }
 
@@ -439,9 +486,13 @@
     if (!layouts.length) return fail('INVALID_MELD', 'Essa carta não encaixa nesse jogo.');
     const lay = layouts[action.option || 0];
     if (!lay) return fail('INVALID_OPTION', 'Opção de disposição inválida.');
+    const guard = openingGuard(state, p, [card]);
+    if (guard) return guard;
+    openingBegin(state, p);
     p.hand = p.hand.filter((c) => c.id !== card.id);
     meld.cards = lay.entries;
     events.push({ type: 'CARD_ADDED', player: p.id, meldId: meld.id, size: lay.size });
+    openingCount(state, p, [card], events);
     return afterPlay(state, p, now, events);
   }
 
@@ -468,6 +519,7 @@
 
   function doDiscard(state, cardId, now, events) {
     const p = cur(state);
+    if (state.opening) return fail('OPENING_INCOMPLETE', 'Dupla vulnerável: faltam ' + (state.config.openMin - state.opening.points) + ' pontos para abrir. Baixe mais cartas ou desfaça a descida.');
     const card = p.hand.find((c) => c.id === cardId);
     if (!card) return fail('CARDS_NOT_IN_HAND', 'Carta não está na sua mão.');
     const emptying = p.hand.length === 1;
@@ -685,6 +737,7 @@
 
   function autoDiscard(state, at, events) {
     const p = cur(state);
+    if (state.opening) { p.hand = state.opening.hand; state.teams[p.team].melds = []; state.opening = null; events.push({ type: 'OPENING_UNDONE', player: p.id }); }
     const pick = chooseAutoDiscard(p.hand);
     const tries = [pick, ...p.hand.filter((c) => c.id !== pick.id)];
     for (const c of tries) {
@@ -746,6 +799,7 @@
         const c = checkTurn(state, action, 'PLAYING');
         return c || doAddMany(state, action, now, events);
       }
+      case 'UNDO_OPENING': return doUndoOpening(state, action, now, events);
       case 'PAUSE': return doPause(state, action, now, events);
       case 'RESUME': return doResume(state, action, now, events);
       case 'PROPOSE_END': return doProposeEnd(state, action, now, events);
@@ -820,6 +874,7 @@
         hand: p.id === playerIdx ? p.hand : undefined
       })),
       teams: state.teams,
+      opening: state.opening ? { player: state.opening.player, points: state.opening.points } : null,
       stockCount: state.stock.length,
       discard: state.discard,
       mortos: state.mortos.map((m) => ({ count: m.cards.length })),

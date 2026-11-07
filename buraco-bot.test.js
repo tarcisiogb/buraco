@@ -59,4 +59,24 @@ t('humano + 3 bots: bots só agem nos seus assentos', () => {
   while (s.turn.player !== 0 && st++ < 50) { const a = Bot.pendingAction(s, [1, 2, 3]); acted.add(a.player); s = E.applyAction(s, a).state; }
   assert(!acted.has(0)); assert.strictEqual(Bot.pendingAction(s, [1, 2, 3]), null);
 });
+t('vulnerável: bots abrem com 75+ ou ficam sem baixar; nada trava', () => {
+  let opened = 0, rounds = 0, bad = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    let s = E.createGame({ seed });
+    s.scores = { A: 1500, B: 1600 };
+    s.teams.A.vulnerable = true; s.teams.A.opened = false; s.teams.B.vulnerable = true; s.teams.B.opened = false;
+    let st = 0;
+    while (s.phase !== 'ROUND_OVER' && s.phase !== 'GAME_OVER' && st++ < 4000) {
+      const a = Bot.pendingAction(s, [0, 1, 2, 3]);
+      assert(a, 'bot sem ação (vulnerável) seed ' + seed);
+      const r = E.applyAction(s, a); assert(r.ok, 'recusada ' + JSON.stringify(a) + ' ' + (r.error && r.error.message));
+      s = r.state;
+    }
+    assert(st < 4000, 'não terminou seed ' + seed);
+    rounds++; if (s.teams.A.opened || s.teams.B.opened) opened++;
+    for (const tt of ['A', 'B']) if (!s.teams[tt].opened && s.teams[tt].melds.length) bad++;
+  }
+  assert.strictEqual(bad, 0, 'jogos na mesa sem a dupla ter aberto');
+  console.log('   rodadas em que alguém abriu', opened, '/', rounds);
+});
 console.log(n + ' passaram');

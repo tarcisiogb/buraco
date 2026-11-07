@@ -276,3 +276,11 @@ Não há pontos em aberto. Ao fechar o documento, assumi duas coisas que você n
 - Ao montar a mesa, quem criou (ou o Master) pode ocupar de **1 a 3 lugares com bots**, na dupla que quiser (parceiro ou adversário). O bot pode ser retirado enquanto a partida não começou.
 - Os bots seguem **exatamente as mesmas regras** e só enxergam o que um jogador enxergaria (a própria mão, os jogos da mesa e o lixo).
 - Os bots jogam pelo celular de um jogador humano sentado na mesa; se ele sair, outro humano assume. Numa partida pausada, os bots esperam. Nos pedidos de encerramento antecipado, os bots **aceitam**.
+
+## 15. DUPLA VULNERÁVEL
+
+- A dupla que começa uma rodada com **1.500 pontos ou mais** está **vulnerável** naquela rodada (vale enquanto o placar dela estiver em 1.500 ou mais). Cada dupla é avaliada separadamente.
+- Para **abrir** (primeira descida da rodada), a dupla vulnerável precisa baixar cartas que somem **75 pontos** (A = 15; K, Q, J, 10, 9, 8 e 2 = 10; 3 a 7 = 5). Os bônus de canastra e de morto não contam.
+- Vários jogos podem ser somados **no mesmo turno**. Enquanto a soma não chega a 75, a descida é provisória: não dá para descartar nem esvaziar a mão. O jogador pode **desfazer a descida** (as cartas voltam para a mão) e tentar outra combinação.
+- Ao chegar em 75 a dupla está **aberta** e joga normalmente pelo resto da rodada. Se o tempo acabar com a descida incompleta, ela é desfeita automaticamente.
+- Configuração do motor: `vulnerableAt` (1500) e `openMin` (75).

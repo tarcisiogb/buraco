@@ -151,7 +151,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .mortos .stk .pc+.pc{margin-left:-14px}
 .lastact{flex:none;min-height:24px;font-size:12px;display:flex;align-items:center;gap:6px;color:#e8f3ec;animation:fadeIn .4s}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-#meldarea{flex:1;min-height:0;display:grid;grid-template-rows:1fr 1fr;gap:6px;overflow:hidden}
+#meldarea{flex:1;min-height:0;display:grid;grid-template-rows:1fr auto 1fr;gap:6px;overflow:hidden}
 .mhalf{min-height:0;overflow:hidden;border-radius:10px;padding:3px 6px}
 .mhalf.ta{background:rgba(45,108,223,.16);box-shadow:inset 0 0 0 1.5px rgba(130,175,255,.45)}
 .mhalf.tb{background:rgba(224,110,55,.15);box-shadow:inset 0 0 0 1.5px rgba(255,170,120,.45)}
@@ -247,6 +247,24 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .mtitle{display:flex;align-items:center;gap:6px}
 .mtitle .zoom{margin-left:auto;background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:2px 9px;cursor:pointer}
 .zoombox{max-height:62vh;overflow:auto;margin-top:8px;--ms:1.9}
+
+.band{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.28);border-radius:12px;padding:5px 7px;min-width:0}
+.band .pile{font-size:10px}
+.band .discardbox{flex:1;min-width:0;padding:2px 3px}
+.band .fanrow{display:flex;overflow:hidden;padding-top:2px;padding-bottom:1px}
+.band .cap{font-size:10px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.band .histl{cursor:pointer}
+.band .inl{display:inline-flex;vertical-align:middle}
+.band .inl .pc{height:calc(var(--cw)*1.2)}
+.band .bside{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.band .mortos{margin:0}
+.sc.vul{border-color:#d33;color:#b21d1d;font-weight:800}
+.sc.me.vul{background:#b21d1d;color:#fff;border-color:#b21d1d}
+.histlist{margin-top:8px;max-height:60vh;overflow:auto;font-size:13px}
+.histlist div{padding:6px 2px;border-bottom:1px solid var(--line)}
+.zoomwrap{display:flex;flex-wrap:wrap;gap:4px;--cw:34px}
+.zoomwrap .pc{height:calc(var(--cw)*1.2);overflow:hidden}
+.band .zoom{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:3px 9px;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
@@ -260,7 +278,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07c";
+var BUILD = "2026-11-07d";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -653,7 +671,7 @@ function listenMesas(){
 }
 function stopMesas(){ if(unsubMesas){ unsubMesas(); unsubMesas = null; } S.mesas = null; stopGame(); S.mesaId = null; }
 
-function stopGame(){ if(unsubGame){ unsubGame(); unsubGame = null; } gameFor = null; S.game = null; S.gameV = 0; S.sel = []; S.picker = null; S.lastN = null; S.anims = []; S.sending = false; S.menu = false; S.zoom = null; }
+function stopGame(){ if(unsubGame){ unsubGame(); unsubGame = null; } gameFor = null; S.game = null; S.gameV = 0; S.sel = []; S.picker = null; S.lastN = null; S.anims = []; S.sending = false; S.menu = false; S.zoom = null; S.hist = null; }
 function ensureGameListener(){
   var m = mesaAtual();
   if(S.mesaId && m && m.status !== "aguardando" && mySeat(m) >= 0 && gameFor !== S.mesaId) startGameListener(S.mesaId);
@@ -877,6 +895,7 @@ function processLog(prev, g, me){
           }
         })();
         break;
+      case "TEAM_OPENED": S.banner = { cls:"limpa", txt:"Dupla aberta!", sub:g.players[e.player].name+" · "+e.points+" pontos", until:now + 2000 }; sfx("canastra"); setTimeout(function(){ S._forceRender = true; render(); }, 2100); break;
       case "MORTO_EM_PE": case "MORTO_DESCARTE": case "MORTO_VIRA_MONTE": sfx("morto"); break;
       case "PAUSED": case "RESUMED": sfx("pause"); break;
       case "ROUND_OVER": case "GAME_OVER": sfx("end"); break;
@@ -993,6 +1012,7 @@ function checkTimeouts(){
     if(evs.length) tx.set(ref, { json:JSON.stringify(st), v:(d.data().v || 0) + 1 });
   }); }).catch(function(){}).then(function(){ S.toBusy = false; resync(); });
 }
+function selPts(g, me){ var t = 0; g.players[me].hand.forEach(function(c){ if(S.sel.indexOf(c.id) >= 0) t += E.cardPoints(c); }); return t; }
 function layLayout(){
   var g = S.game, me = mySeat(S.lastMesa), ids = S.sel.slice();
   if(ids.length < 3){ toast("Selecione 3 ou mais cartas para baixar um jogo."); return; }
@@ -1072,6 +1092,8 @@ function logTxt(g, e){
     case "RESUMED": return n(e.player)+" retomou o jogo";
     case "END_PROPOSED": return n(e.player)+" propôs encerrar a partida";
     case "END_REFUSED": return n(e.player)+" recusou encerrar";
+    case "TEAM_OPENED": return n(e.player)+" abriu a dupla ("+e.points+" pts)";
+    case "OPENING_UNDONE": return n(e.player)+" desfez a descida";
     case "ROUND_OVER": return "Fim da rodada";
     case "GAME_OVER": return "Fim da partida";
     case "ROUND_STARTED": return "Rodada "+e.round+" começou";
@@ -1087,7 +1109,7 @@ function gameHtml(m, me){
   var g = S.game, team = me%2===0?"A":"B", opp = team==="A"?"B":"A", now = Date.now();
   var active = (g.phase==="WAITING_TURN"||g.phase==="PLAYING"), myTurn = active && g.turn.player === me && !g.paused, canPick = myTurn && g.phase==="WAITING_TURN";
   var h = ['<div class="gscreen'+(myTurn?" mt":"")+'">'];
-  h.push('<div class="gtop"><button class="iconbtn" data-action="mesa-back" title="Voltar às mesas">‹</button><div class="score"><span class="sc me">Nós <b>'+g.scores[team]+'</b></span><span class="sc">Eles <b>'+g.scores[opp]+'</b></span></div>'+
+  h.push('<div class="gtop"><button class="iconbtn" data-action="mesa-back" title="Voltar às mesas">‹</button><div class="score"><span class="sc me'+(g.teams[team].vulnerable?" vul":"")+'">Nós <b>'+g.scores[team]+'</b>'+(g.teams[team].vulnerable?' ⚠':"")+'</span><span class="sc'+(g.teams[opp].vulnerable?" vul":"")+'">Eles <b>'+g.scores[opp]+'</b>'+(g.teams[opp].vulnerable?' ⚠':"")+'</span></div>'+
     (S.offline?'<span class="badgeoff">offline</span>':"")+
     '<button class="iconbtn'+(MUTED?"":" on")+'" data-action="g-mute" title="Som">'+(MUTED?"🔇":"🔊")+'</button><button class="iconbtn" data-action="g-pause" title="Pausar">⏸</button><button class="iconbtn" data-action="g-menu" title="Mais">⋯</button></div>');
   if(g.endVote){
@@ -1097,21 +1119,21 @@ function gameHtml(m, me){
   h.push('<div class="opps">'+oppChip(g,m,(me+1)%4)+oppChip(g,m,(me+2)%4,true)+oppChip(g,m,(me+3)%4)+'</div>');
   // mesa
   var dis = g.discard, landing = (S.landId && now < S.landUntil) ? S.landId : null;
-  var drows = rowsOf(dis, 16).map(function(r, ri, all){ return '<div class="fanrow">'+r.map(function(c, ci){ var last = ri===all.length-1 && ci===r.length-1; return cardHtml(c, last && landing===c.id ? "land" : ""); }).join("")+'</div>'; }).join("");
-  h.push('<div class="felt"><div class="center">'+
-    '<div class="pile'+(canPick?" tapok":"")+'" data-action="g-stock"><div id="pile-stock" class="pc back" style="--cw:32px"></div><div>Monte<br><b>'+g.stock.length+'</b></div></div>'+
-    '<div class="discardbox'+(canPick&&dis.length?" tapok":"")+'" id="pile-discard" '+(dis.length?'data-action="g-discard"':'')+' style="--cw:28px">'+(dis.length?drows:'<div class="cap" style="padding:8px 2px;opacity:.7">Lixo vazio</div>')+'<div class="cap">Lixo · '+dis.length+(canPick&&dis.length?' · toque para pegar':"")+'</div></div>'+
-    '<div class="mortos">Mortos <b>'+g.mortos.length+'</b><br>nós '+(g.teams[team].mortoTaken?"✓":"—")+'<br>eles '+(g.teams[opp].mortoTaken?"✓":"—")+'</div></div>');
   var lastE = null, lg = (g.log||[]); for(var q=lg.length-1;q>=0;q--){ if(logTxt(g, lg[q])){ lastE = lg[q]; break; } }
-  h.push('<div class="lastact">'+(lastE?esc(logTxt(g,lastE))+(lastE.type==="DISCARDED"?' <span style="--cw:22px">'+cardHtml(lastE.card,"")+'</span>':""):"&nbsp;")+'</div>');
+  var lastTxt = lastE ? esc(logTxt(g,lastE))+(lastE.type==="DISCARDED"?' <span class="inl" style="--cw:16px">'+cardHtml(lastE.card,"")+'</span>':"") : "";
+  var drow = '<div class="fanrow">'+dis.map(function(c, ci){ return cardHtml(c, (ci===dis.length-1 && landing===c.id) ? "land" : ""); }).join("")+'</div>';
+  var band = '<div class="band">'+
+    '<div class="pile'+(canPick?" tapok":"")+'" data-action="g-stock"><div id="pile-stock" class="pc back" style="--cw:30px"></div><div>Monte <b>'+g.stock.length+'</b></div></div>'+
+    '<div class="discardbox'+(canPick&&dis.length?" tapok":"")+'" id="pile-discard" '+(dis.length?'data-action="g-discard"':'')+' style="--cw:26px">'+(dis.length?drow:'<div class="cap" style="padding:10px 2px;opacity:.7">Lixo vazio</div>')+'<div class="cap"><span data-action="hist" class="histl"><b>Lixo '+dis.length+'</b> · '+(lastTxt||"—")+'</span></div></div>'+
+    '<div class="bside"><button class="zoom" data-action="zoom-melds" data-id="discard">⤢ lixo</button><div class="mortos">Mortos <b>'+g.mortos.length+'</b><br>nós '+(g.teams[team].mortoTaken?"✓":"—")+' · eles '+(g.teams[opp].mortoTaken?"✓":"—")+'</div></div></div>';
   var tap = myTurn && g.phase==="PLAYING" && S.sel.length>=1;
-  h.push('<div id="meldarea">'+halfHtml(g, opp, false, false)+halfHtml(g, team, true, tap)+'</div></div>');
+  h.push('<div class="felt"><div id="meldarea">'+halfHtml(g, opp, false, false)+band+halfHtml(g, team, true, tap)+'</div></div>');
   // status + ações
-  var left = timerInfo(g);
-  var st = !active ? "" : (g.paused ? "⏸ Jogo pausado" : (myTurn ? '<div class="turnbar">▶ SUA VEZ · '+(g.phase==="WAITING_TURN"?"toque no monte ou no lixo":(S.sel.length===1?"toque num jogo ou descarte":"selecione cartas"))+'</div>' : "Vez de <b>"+esc(g.players[g.turn.player].name)+'</b>'+(isBot(m.seats[g.turn.player])?' <span class="dots"></span>':"")));
+  var left = timerInfo(g), vulOpen = !!(g.teams[team].vulnerable && !g.teams[team].opened);
+  var st = !active ? "" : (g.paused ? "⏸ Jogo pausado" : (myTurn ? '<div class="turnbar">▶ SUA VEZ · '+(g.phase==="WAITING_TURN"?"toque no monte ou no lixo":(S.sel.length===1?"toque num jogo ou descarte":"selecione cartas"))+(vulOpen?' · <span style="color:#8a1010">⚠ abrir '+(g.opening?g.opening.points:0)+'/'+g.config.openMin+'</span>':"")+'</div>' : "Vez de <b>"+esc(g.players[g.turn.player].name)+'</b>'+(isBot(m.seats[g.turn.player])?' <span class="dots"></span>':"")));
   h.push('<div class="statusrow">'+st+(left!==null?'<span id="tnum" style="margin-left:auto;font-weight:800">'+left+'s</span>':"")+(S.sending?'<span class="muted" style="margin-left:auto">enviando…</span>':"")+'</div>');
   if(myTurn && g.phase==="PLAYING"){
-    h.push('<div class="acts"><button class="btn" data-action="g-lay"'+(S.sel.length>=3?"":" disabled")+'>Baixar jogo'+(S.sel.length>=3?" ("+S.sel.length+")":"")+'</button><button class="btn danger" data-action="g-throw"'+(S.sel.length===1?"":" disabled")+'>Descartar</button></div>');
+    h.push('<div class="acts"><button class="btn" data-action="g-lay"'+(S.sel.length>=3?"":" disabled")+'>Baixar jogo'+(S.sel.length>=3?" ("+S.sel.length+(vulOpen?" · "+selPts(g, me)+" pts":"")+")":"")+'</button>'+(g.opening?'<button class="btn ghost" data-action="g-undo">↩ Desfazer</button>':"")+'<button class="btn danger" data-action="g-throw"'+(S.sel.length===1?"":" disabled")+'>Descartar</button></div>');
   }
   var mine = sortedHand(g.players[me].hand), hn = now < S.newUntil ? S.newIds : [];
   var hrows = rowsOf(mine, 15).map(function(r){ return '<div class="hrow">'+r.map(function(c){ var isNew = hn.indexOf(c.id) >= 0; return cardHtml(c, (S.sel.indexOf(c.id)>=0?"sel ":"")+(isNew?"new":""), 'data-action="g-sel" data-id="'+c.id+'"'); }).join("")+'</div>'; }).join("");
@@ -1119,7 +1141,9 @@ function gameHtml(m, me){
   h.push('</div>');
   var out = h.join("");
   if(S.banner && now < S.banner.until) out += '<div class="banner '+S.banner.cls+'">'+esc(S.banner.txt)+'<small>'+esc(S.banner.sub)+'</small></div>';
-  if(S.zoom){ var zt = S.zoom === "us" ? team : opp; out += '<div class="modalbg" data-action="close-zoom"><div class="modal wide" data-stop="1"><h3>'+(S.zoom==="us"?"Nossos jogos":"Jogos deles")+'</h3><div class="zoombox"><div class="meldwrap">'+g.teams[zt].melds.map(function(ml){ return meldHtml(ml, false); }).join("")+'</div></div><button class="btn ghost" data-action="close-zoom">Fechar</button></div></div>'; }
+  if(S.zoom === "discard") out += '<div class="modalbg" data-action="close-zoom"><div class="modal wide" data-stop="1"><h3>Lixo · '+dis.length+' cartas</h3><p class="muted" style="margin-top:2px">Da mais antiga para a mais nova.</p><div class="zoombox"><div class="zoomwrap">'+dis.map(function(c){ return cardHtml(c, ""); }).join("")+'</div></div><button class="btn ghost" data-action="close-zoom">Fechar</button></div></div>';
+  else if(S.zoom){ var zt = S.zoom === "us" ? team : opp; out += '<div class="modalbg" data-action="close-zoom"><div class="modal wide" data-stop="1"><h3>'+(S.zoom==="us"?"Nossos jogos":"Jogos deles")+'</h3><div class="zoombox"><div class="meldwrap">'+g.teams[zt].melds.map(function(ml){ return meldHtml(ml, false); }).join("")+'</div></div><button class="btn ghost" data-action="close-zoom">Fechar</button></div></div>'; }
+  if(S.hist){ var hl = (g.log||[]).slice().reverse().map(function(e){ var t = logTxt(g, e); return t ? '<div>'+esc(t)+(e.type==="DISCARDED"?' '+'<span class="inl" style="--cw:18px;display:inline-flex;vertical-align:middle">'+cardHtml(e.card,"")+'</span>':"")+'</div>' : ""; }).join("").split("</div>").slice(0,10).join("</div>"); out += '<div class="modalbg" data-action="close-hist"><div class="modal wide" data-stop="1"><h3>Últimas jogadas</h3><div class="histlist">'+hl+'</div><button class="btn ghost" data-action="close-hist">Fechar</button></div></div>'; }
   if(S.picker) out += pickerHtml();
   if(g.paused && g.phase !== "GAME_OVER") out += '<div class="modalbg"><div class="modal"><div style="font-size:42px">⏸</div><h3>Jogo pausado</h3><p class="muted" style="margin-top:6px">'+esc(g.players[g.paused.by].name)+' pausou a partida.</p><button class="btn" data-action="g-resume">Continuar</button><button class="btn ghost" data-action="mesa-back">Sair e voltar depois</button><p class="muted" style="margin-top:8px;font-size:12px">A partida fica salva: dá para retomar em outro momento.</p></div></div>';
   if(S.menu) out += '<div class="modalbg" data-action="close-menu"><div class="modal wide" data-stop="1"><h3>Mais opções</h3><button class="btn ghost" data-action="g-propose-end"'+(g.endVote?" disabled":"")+'>Propor encerrar a partida</button>'+(canForceEnd(m)?'<button class="btn danger" data-action="g-end-now">Encerrar agora (administrador)</button>':"")+'<button class="btn ghost" data-action="close-menu">Fechar</button></div></div>';
@@ -1152,6 +1176,7 @@ function endHtml(g, team, opp){
   }
   if(!early) h.push('<tr class="tot"><td>Placar</td><td>'+r.scoresAfter[team]+'</td><td>'+r.scoresAfter[opp]+'</td></tr>');
   if(!early) h.push('</table>');
+  if(!over && !early){ var vt = []; if(r.scoresAfter[team] >= g.config.vulnerableAt) vt.push("Nós"); if(r.scoresAfter[opp] >= g.config.vulnerableAt) vt.push("Eles"); if(vt.length) h.push('<p class="muted" style="margin-top:10px">⚠ <b>Vulnerável na próxima rodada: '+vt.join(" e ")+'.</b> A primeira descida precisa somar '+g.config.openMin+' pontos em cartas.</p>'); }
   h.push(over ? '<button class="btn" data-action="mesa-back">Voltar às mesas</button>' : '<button class="btn" data-action="g-next">Próxima rodada</button>');
   h.push('</div></div>');
   return h.join("");
@@ -1165,7 +1190,7 @@ function layoutFans(){
     var w = cs[0].offsetWidth, W = row.clientWidth;
     for(var j=0;j<n;j++) cs[j].style.marginLeft = "";
     if(n > 1){
-      var step = Math.min(w * (row.className.indexOf("hrow")>=0 ? 0.62 : 0.7), (W - w) / (n - 1));
+      var step = Math.max(row.className.indexOf("fanrow")>=0 ? 7 : 0, Math.min(w * (row.className.indexOf("hrow")>=0 ? 0.62 : 0.7), (W - w) / (n - 1)));
       for(var k=1;k<n;k++) cs[k].style.marginLeft = (step - w) + "px";
     }
   }
@@ -1191,7 +1216,7 @@ window.addEventListener("resize", function(){ if(S._inGame){ layoutFans(); fitMe
 
 document.addEventListener("click", function(ev){
   var el = ev.target.closest("[data-action]"); if(!el) return;
-  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu" || da0 === "close-zoom") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
+  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
   var act = el.getAttribute("data-action"), id = el.getAttribute("data-id");
   switch(act){
     case "reload": location.reload(); break;
@@ -1211,6 +1236,9 @@ document.addEventListener("click", function(ev){
     case "g-mute": MUTED = !MUTED; try{ localStorage.setItem("buraco_mute", MUTED ? "1" : "0"); }catch(e){} if(!MUTED){ unlockAudio(true); setTimeout(function(){ sfx("turn"); }, 120); } S._forceRender = true; render(); break;
     case "g-pause": jogar("PAUSE"); break;
     case "g-resume": jogar("RESUME"); break;
+    case "hist": S.hist = true; S._forceRender = true; render(); break;
+    case "close-hist": S.hist = null; S._forceRender = true; render(); break;
+    case "g-undo": jogar("UNDO_OPENING"); break;
     case "zoom-melds": S.zoom = id; S._forceRender = true; render(); break;
     case "close-zoom": S.zoom = null; S._forceRender = true; render(); break;
     case "g-menu": S.menu = true; S._forceRender = true; render(); break;

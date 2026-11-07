@@ -146,7 +146,9 @@
         }
       }
     }
-    cands.sort((x, y) => y.length - x.length);
+    const tm0 = state.teams[teamOf(me)], vul = tm0.vulnerable && !tm0.opened;
+    const pts = (ids) => ids.reduce((a, id) => a + E.cardPoints(hand.find((c) => c.id === id)), 0);
+    cands.sort((x, y) => vul ? (pts(y) - pts(x)) : (y.length - x.length));
     for (const ids of cands) {
       const opts = E.getMeldOptions(state, me, ids);
       if (!opts.length) continue;
@@ -182,6 +184,37 @@
 
   // ───────────── Escolha da ação ─────────────
 
+  /** Próxima jogada na mesa (encaixar carta ou baixar jogo), ou null */
+  function tableAction(state, me) {
+    const add = bestAdd(state, me);
+    if (add && trial(state, add)) return add;
+    const lay = bestLay(state, me);
+    if (lay) return lay;
+    const team = state.teams[teamOf(me)];
+    for (const meld of team.melds) for (const c of state.players[me].hand) {
+      const lays = E.findAddLayouts(meld, c);
+      if (!lays.length) continue;
+      let oi = 0;
+      lays.forEach((l, i) => { if (wildCount(l.entries) < wildCount(lays[oi].entries)) oi = i; });
+      const a = { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi };
+      if (wildCount(lays[oi].entries) > wildCount(meld.cards) && !wildOk(state, me, meld.cards.length + 1, a)) continue;
+      if (trial(state, a)) return a;
+    }
+    return null;
+  }
+
+  /** Dupla vulnerável: simula as descidas e vê se chega aos pontos mínimos neste turno */
+  function canOpen(state, me) {
+    let sim = state;
+    for (let i = 0; i < 14 && sim; i++) {
+      if (sim.teams[teamOf(me)].opened) return true;
+      const a = tableAction(sim, me);
+      if (!a) return false;
+      sim = trial(sim, a);
+    }
+    return !!(sim && sim.teams[teamOf(me)].opened);
+  }
+
   /** Próxima ação do bot sentado em `me` (vez dele). Retorna null se não for a vez. */
   function chooseAction(state, me) {
     if (state.paused || state.turn.player !== me) return null;
@@ -192,20 +225,13 @@
       return null;
     }
     if (state.phase !== 'PLAYING') return null;
-    const add = bestAdd(state, me);
-    if (add && trial(state, add)) return add;
-    const lay = bestLay(state, me);
-    if (lay) return lay;
-    // outras cartas que encaixam (a melhor pode ter sido recusada pela regra da última carta)
-    const team = state.teams[teamOf(me)];
-    for (const meld of team.melds) for (const c of state.players[me].hand) {
-      const lays = E.findAddLayouts(meld, c);
-      if (!lays.length) continue;
-      let oi = 0;
-      lays.forEach((l, i) => { if (wildCount(l.entries) < wildCount(lays[oi].entries)) oi = i; });
-      const a = { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi };
-      if (wildCount(lays[oi].entries) > wildCount(meld.cards) && !wildOk(state, me, meld.cards.length + 1, a)) continue;
-      if (trial(state, a)) return a;
+    const tm = state.teams[teamOf(me)];
+    const vulnerable = tm.vulnerable && !tm.opened;
+    // dupla vulnerável: só começa a descer se der para chegar nos pontos mínimos
+    if (!(vulnerable && !state.opening && !canOpen(state, me))) {
+      const t = tableAction(state, me);
+      if (t) return t;
+      if (state.opening) return { type: 'UNDO_OPENING', player: me };
     }
     for (const c of chooseDiscards(state, me)) {
       const a = { type: 'DISCARD', player: me, cardId: c.id };

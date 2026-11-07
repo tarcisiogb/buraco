@@ -715,5 +715,61 @@ test('várias cartas: se uma não encaixa, nada é aplicado', () => {
   assert.strictEqual(s.teams.A.melds[0].cards.length, 3);
 });
 
+// ───────── Vulnerável (seção 8.5) ─────────
+function vul(handStr, extra = '') {
+  const s = fresh({ config: { drawSeconds: 0, playSeconds: 0 } });
+  s.teams.A.vulnerable = true; s.teams.A.opened = false;
+  const hand = K(handStr + ' ' + extra);
+  s.players[0].hand = hand; s.phase = 'PLAYING'; s.turn = { player: 0, deadline: null, drewFrom: 'STOCK' };
+  return { s, hand };
+}
+test('vulnerável: dupla com 1500+ começa a rodada vulnerável; a outra não', () => {
+  const s = fresh(); s.scores = { A: 1500, B: 1499 };
+  E._internal.dealRound(s, 0);
+  assert.strictEqual(s.teams.A.vulnerable, true); assert.strictEqual(s.teams.A.opened, false);
+  assert.strictEqual(s.teams.B.vulnerable, false); assert.strictEqual(s.teams.B.opened, true);
+});
+test('vulnerável: jogo de 15 pontos não abre; descartar é recusado até abrir; desfazer devolve as cartas', () => {
+  const { s, hand } = vul('3S 4S 5S', '9C 9D KH');
+  let r = must(play(s, { type: 'LAY_MELD', player: 0, cardIds: ids(hand.slice(0, 3)), option: 0 }));
+  assert.strictEqual(r.teams.A.opened, false); assert.strictEqual(r.opening.points, 15);
+  const d = play(r, { type: 'DISCARD', player: 0, cardId: hand[3].id });
+  assert.strictEqual(d.ok, false); assert.strictEqual(d.error.code, 'OPENING_INCOMPLETE');
+  r = must(play(r, { type: 'UNDO_OPENING', player: 0 }));
+  assert.strictEqual(r.players[0].hand.length, 6); assert.strictEqual(r.teams.A.melds.length, 0); assert.strictEqual(r.opening, null);
+  must(play(r, { type: 'DISCARD', player: 0, cardId: hand[3].id }));
+});
+test('vulnerável: vários jogos no mesmo turno somam 75 e abrem a dupla', () => {
+  const { s, hand } = vul('9H 10H JH QH KH', '8S 9S 10S 4C');
+  let r = must(play(s, { type: 'LAY_MELD', player: 0, cardIds: ids(hand.slice(0, 5)), option: 0 })); // 50
+  assert.strictEqual(r.teams.A.opened, false);
+  r = must(play(r, { type: 'LAY_MELD', player: 0, cardIds: ids(hand.slice(5, 8)), option: 0 }));   // +30 = 80
+  assert.strictEqual(r.teams.A.opened, true); assert.strictEqual(r.opening, null);
+  assert(r.events === undefined || true);
+  must(play(r, { type: 'DISCARD', player: 0, cardId: hand[8].id }));
+});
+test('vulnerável: não pode esvaziar a mão antes de somar 75', () => {
+  const { s, hand } = vul('3S 4S 5S');
+  const r = play(s, { type: 'LAY_MELD', player: 0, cardIds: ids(hand), option: 0 });
+  assert.strictEqual(r.ok, false); assert.strictEqual(r.error.code, 'OPENING_INCOMPLETE');
+});
+test('vulnerável: dupla já aberta joga normal; a outra dupla nunca é afetada', () => {
+  const { s, hand } = vul('3S 4S 5S', '9C 9D');
+  s.teams.A.opened = true;
+  let r = must(play(s, { type: 'LAY_MELD', player: 0, cardIds: ids(hand.slice(0, 3)), option: 0 }));
+  must(play(r, { type: 'DISCARD', player: 0, cardId: hand[3].id }));
+  const t = fresh(); t.players[1].hand = K('3S 4S 5S 9C'); t.phase = 'PLAYING'; t.turn = { player: 1, deadline: null, drewFrom: 'STOCK' };
+  t.teams.A.vulnerable = true; t.teams.A.opened = false;
+  const r2 = must(play(t, { type: 'LAY_MELD', player: 1, cardIds: ids(t.players[1].hand.slice(0, 3)), option: 0 }));
+  must(play(r2, { type: 'DISCARD', player: 1, cardId: t.players[1].hand[3].id }));
+});
+test('vulnerável: estourar o tempo com descida incompleta desfaz e descarta', () => {
+  const { s, hand } = vul('3S 4S 5S', '9C 9D KH');
+  s.config.playSeconds = 40; s.turn.deadline = 50000;
+  const r = must(play(s, { type: 'LAY_MELD', player: 0, cardIds: ids(hand.slice(0, 3)), option: 0 }, 1000));
+  const t = E.applyAction(r, { type: 'PAUSE', player: 1 }, 99999); // força processTimeouts
+  assert.strictEqual(t.state.opening, null); assert.strictEqual(t.state.teams.A.melds.length, 0);
+});
+
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);
