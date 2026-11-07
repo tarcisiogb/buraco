@@ -609,6 +609,7 @@
       if (a > b) winner = 'A';
       else if (b > a) winner = 'B'; // empate na meta: segue para outra rodada
     }
+    state.history = (state.history || []).concat([{ round: state.round, reason, by, A: detail.A.total, B: detail.B.total }]);
     state.roundResult = { reason, by, detail, scoresAfter: { A: a, B: b } };
     state.pendingRoundEnd = false;
     state.winner = winner;

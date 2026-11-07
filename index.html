@@ -271,6 +271,22 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .vulstrip{flex:none;background:#fde8e8;color:#8a1010;border:1.5px solid #e49a9a;border-radius:10px;padding:4px 9px;font-size:11.5px;line-height:1.25;text-align:center}
 .vulstrip.me{background:#c62828;color:#fff;border-color:#c62828;font-size:12.5px;animation:turnPulse 1.6s ease-in-out infinite}
 .banner.vul{background:linear-gradient(135deg,#b71c1c,#e53935)}
+
+.seg{display:flex;gap:6px;margin-top:12px}.seg button{flex:1;padding:9px 8px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--ink-soft);cursor:pointer}.seg button.on{background:var(--felt);color:#fff;border-color:var(--felt)}.seg.sm button{font-size:11.5px;padding:8px 4px}
+.chk{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px}
+.rkwrap{overflow-x:auto;margin-top:12px;-webkit-overflow-scrolling:touch}
+.rk{border-collapse:collapse;width:100%;font-size:12px}
+.rk th,.rk td{padding:7px 2px;text-align:center;border-bottom:1px solid var(--line)}
+.rk td.l,.rk th.l{padding-left:4px}
+.rk .rkn span:last-child{white-space:normal;line-height:1.1}
+.rk .av.sm{width:20px;height:20px;font-size:9px}
+.panel.rkp{padding:14px 8px}
+.rk th{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);cursor:pointer;position:sticky;top:0;background:#fff}
+.rk th.on{color:var(--felt);font-weight:800}
+.rk .l{text-align:left}
+.rk tr.me td{background:var(--gold-soft)}
+.rkn{display:inline-flex;align-items:center;gap:6px}
+.av.sm{width:24px;height:24px;font-size:10px;margin:0;cursor:default;flex:none}
 </style>
 </head>
 <body>
@@ -284,7 +300,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07g";
+var BUILD = "2026-11-07h";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -353,7 +369,25 @@ function setMsg(tipo, txt){ S.msg = txt ? {tipo:tipo, txt:txt} : null; }
 function msgHtml(){ if(!S.msg) return ""; var h = '<div class="msg '+S.msg.tipo+'" role="alert">'+esc(S.msg.txt)+'</div>'; return h; }
 
 /* ───────── Listeners ───────── */
-function stopListeners(){ if(unsubMe){ unsubMe(); unsubMe = null; } if(unsubPlayers){ unsubPlayers(); unsubPlayers = null; } if(typeof stopMesas === "function") stopMesas(); }
+var unsubPartidas = null;
+function listenPartidas(){
+  if(unsubPartidas) return;
+  unsubPartidas = db.collection("partidas").onSnapshot(function(snap){
+    S.partidas = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
+    if(S.tab === "ranking" || S.tab === "perfil") render();
+  }, function(){ S.partidas = S.partidas || []; });
+}
+function registrarPartida(st, m){
+  try{
+    if(!st || st.phase !== "GAME_OVER" || !st.winner || !m || !m.seats) return;
+    var bat = [0,0,0,0]; (st.history || []).forEach(function(h){ if(h.reason === "BATIDA" && h.by != null && bat[h.by] !== undefined) bat[h.by]++; });
+    db.collection("partidas").doc(S.mesaId).set({
+      jogadores: m.seats.slice(), vencedor: st.winner, rodadas: (st.history && st.history.length) || st.round || 1,
+      placar: { A: st.scores.A, B: st.scores.B }, batidas: bat, nome: m.nome || "", fim: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(function(){});
+  }catch(e){}
+}
+function stopListeners(){ if(unsubPartidas){ unsubPartidas(); unsubPartidas = null; }  if(unsubMe){ unsubMe(); unsubMe = null; } if(unsubPlayers){ unsubPlayers(); unsubPlayers = null; } if(typeof stopMesas === "function") stopMesas(); }
 function listenPlayers(){
   if(unsubPlayers) return;
   var q = db.collection("jogadores");
@@ -371,7 +405,7 @@ function listenMe(uid){
     S.me = d.data(); S.me.id = d.id;
     if(S.me.status === "aprovado"){
       if(unsubPlayers && isMaster() !== S._masterListen){ unsubPlayers(); unsubPlayers = null; }
-      S._masterListen = isMaster(); listenPlayers(); listenMesas();
+      S._masterListen = isMaster(); listenPlayers(); listenMesas(); listenPartidas();
     }
     render();
   }, function(){ S.meLoaded = true; S.me = null; render(); });
@@ -467,16 +501,81 @@ function viewRefused(){
 }
 
 /* App aprovado */
+
+/* ── ranking ── */
+S.partidas = null; S.rk = { view:"jog", sort:"pts", bots:true, dsort:"v" };
+var RK_PTS = { v:10, q:2, bat:1 };
+function nomeJogador(uid){
+  if(isBot(uid)) return botPlayer(uid).nome;
+  var p = playerByUid(uid); return p ? (p.apelido || primeiro(p.nome)) : "Ex-jogador";
+}
+function avatarRk(uid){
+  if(isBot(uid)) return '<div class="av sm">🤖</div>';
+  var p = playerByUid(uid); return '<div class="av sm">'+(p && p.foto ? '<img src="'+esc(p.foto)+'" alt="">' : esc(p ? initials(p.nome) : "?"))+'</div>';
+}
+function computeStats(list){
+  var pl = {}, du = {};
+  function P(id){ return pl[id] || (pl[id] = { id:id, p:0, v:0, q:0, maos:0, bat:0 }); }
+  (list || []).forEach(function(m){
+    if(!m.jogadores || m.jogadores.length !== 4 || !m.vencedor) return;
+    for(var i=0;i<4;i++){
+      var id = m.jogadores[i]; if(!id) continue; var t = i % 2 === 0 ? "A" : "B", s = P(id);
+      s.p++; if(t === m.vencedor) s.v++; else s.q++;
+      s.maos += m.rodadas || 0; s.bat += (m.batidas && m.batidas[i]) || 0;
+    }
+    [[0,2,"A"],[1,3,"B"]].forEach(function(pr){
+      var a = m.jogadores[pr[0]], b = m.jogadores[pr[1]]; if(!a || !b) return;
+      var key = [a,b].sort().join("|"), d = du[key] || (du[key] = { key:key, a:a, b:b, j:0, v:0, d:0 });
+      d.j++; if(pr[2] === m.vencedor) d.v++; else d.d++;
+    });
+  });
+  var jog = Object.keys(pl).map(function(k){ var s = pl[k]; s.pct = s.p ? Math.round(s.v / s.p * 100) : 0; s.pts = s.v*RK_PTS.v + s.q*RK_PTS.q + s.bat*RK_PTS.bat; return s; });
+  var dup = Object.keys(du).map(function(k){ var d = du[k]; d.pct = d.j ? Math.round(d.v / d.j * 100) : 0; return d; });
+  return { jog:jog, dup:dup };
+}
+function rkHead(id, label, cur){ return '<th class="'+(cur===id?"on":"")+'" data-action="rk-sort" data-id="'+id+'">'+label+(cur===id?" ▾":"")+'</th>'; }
+function viewRanking(){
+  var h = ['<div class="panel rkp"><div class="eyebrow" style="padding-left:6px">Ranking</div><h2 class="ph" style="padding-left:6px">Quem manda no buraco</h2>'];
+  if(S.partidas === null){ h.push('<p class="muted" style="margin-top:10px">Carregando…</p></div>'); return h.join(""); }
+  var st = computeStats(S.partidas), rk = S.rk;
+  h.push('<div class="seg"><button class="'+(rk.view==="jog"?"on":"")+'" data-action="rk-view" data-id="jog">Jogadores</button><button class="'+(rk.view==="dup"?"on":"")+'" data-action="rk-view" data-id="dup">Duplas</button></div>');
+  if(!S.partidas.length){ h.push('<p class="muted" style="margin-top:14px">Nenhuma partida concluída ainda. O ranking começa a contar quando uma partida chega ao fim (encerramento antecipado não conta).</p></div>'); return h.join(""); }
+  if(rk.view === "jog"){
+    var rows = st.jog.filter(function(s){ return rk.bots || !isBot(s.id); });
+    var key = rk.sort; rows.sort(function(a,b){ return (b[key]-a[key]) || (b.pts-a.pts) || (b.v-a.v) || (a.p-b.p); });
+    h.push('<label class="chk"><input type="checkbox" '+(rk.bots?"checked":"")+' data-action="rk-bots"> Mostrar bots</label>');
+    h.push('<div class="rkwrap"><table class="rk"><tr><th>#</th><th class="l">Jogador</th>'+rkHead("pts","Pts",key)+rkHead("p","Part",key)+rkHead("v","Vit.",key)+rkHead("q","Qued.",key)+rkHead("pct","%",key)+rkHead("maos","Mãos",key)+rkHead("bat","Bat.",key)+'</tr>');
+    rows.forEach(function(s, i){
+      h.push('<tr class="'+(S.user && s.id===S.user.uid?"me":"")+'"><td>'+(i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1))+'</td><td class="l"><span class="rkn">'+avatarRk(s.id)+'<span>'+esc(nomeJogador(s.id))+'</span></span></td><td><b>'+s.pts+'</b></td><td>'+s.p+'</td><td>'+s.v+'</td><td>'+s.q+'</td><td>'+s.pct+'%</td><td>'+s.maos+'</td><td>'+s.bat+'</td></tr>');
+    });
+    h.push('</table></div>');
+    h.push('<p class="muted" style="margin-top:10px;font-size:12px">Pontuação = '+RK_PTS.v+' por vitória + '+RK_PTS.q+' por queda (partida perdida) + '+RK_PTS.bat+' por batida. Mãos = rodadas jogadas. % = vitórias ÷ partidas. Toque no título da coluna para ordenar.</p>');
+  } else {
+    var ds = st.dup.slice(), dk = rk.dsort;
+    ds.sort(function(a,b){ return dk==="j" ? (b.j-a.j || b.v-a.v) : dk==="pct" ? (b.pct-a.pct || b.j-a.j) : (b.v-a.v || b.pct-a.pct || b.j-a.j); });
+    h.push('<div class="seg sm"><button class="'+(dk==="v"?"on":"")+'" data-action="rk-dsort" data-id="v">Mais vitoriosas</button><button class="'+(dk==="j"?"on":"")+'" data-action="rk-dsort" data-id="j">Mais jogaram juntas</button><button class="'+(dk==="pct"?"on":"")+'" data-action="rk-dsort" data-id="pct">Aproveitamento</button></div>');
+    h.push('<div class="rkwrap"><table class="rk"><tr><th>#</th><th class="l">Dupla</th><th>Jogos</th><th>Vit.</th><th>Der.</th><th>%</th></tr>');
+    ds.forEach(function(d, i){
+      var mine = S.user && (d.a===S.user.uid || d.b===S.user.uid);
+      h.push('<tr class="'+(mine?"me":"")+'"><td>'+(i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1))+'</td><td class="l"><span class="rkn">'+avatarRk(d.a)+avatarRk(d.b)+'<span>'+esc(nomeJogador(d.a))+' + '+esc(nomeJogador(d.b))+'</span></span></td><td>'+d.j+'</td><td><b>'+d.v+'</b></td><td>'+d.d+'</td><td>'+d.pct+'%</td></tr>');
+    });
+    h.push('</table></div><p class="muted" style="margin-top:10px;font-size:12px">Aproveitamento = vitórias ÷ jogos da dupla.</p>');
+  }
+  h.push('</div>');
+  return h.join("");
+}
+function meusStats(){ var st = computeStats(S.partidas || []), uid = S.user && S.user.uid, me = null; st.jog.forEach(function(s){ if(s.id === uid) me = s; }); return me || { p:0, v:0, q:0, pts:0, maos:0, bat:0 }; }
 function viewApp(){
   if(S.mesaId){ var mv = viewMesa(); if(mv) return mv; }
   var pend = isMaster() ? S.players.filter(function(p){ return p.status === "pendente"; }).length : 0;
   var h = ['<div class="wrap">'];
   h.push('<div class="topbar"><div class="who">'+avatar(S.me)+'<div><div class="name">'+esc(nomeExib(S.me))+'</div><div class="sub">'+(isMaster()?"Master":"Jogador")+'</div></div></div><button class="btn ghost small" data-action="logout">Sair</button></div>');
   h.push('<div class="tabs" role="tablist">');
-  h.push(tabBtn("inicio","Início")); h.push(tabBtn("perfil","Meu cadastro"));
+  h.push(tabBtn("inicio","Início")); h.push(tabBtn("ranking","Ranking")); h.push(tabBtn("perfil","Meu cadastro"));
   if(isMaster()) h.push(tabBtn("admin","Administração", pend));
   h.push('</div>');
-  if(S.tab === "perfil") h.push(viewPerfil());
+  if(S.tab === "ranking") h.push(viewRanking());
+  else if(S.tab === "perfil") h.push(viewPerfil());
   else if(S.tab === "admin" && isMaster()) h.push(viewAdmin());
   else h.push(viewInicio());
   h.push('</div>');
@@ -525,7 +624,7 @@ function viewPerfil(){
     h.push('<p class="muted" style="margin-top:6px">Sua conta usa o login do Google, então não há senha para trocar aqui.</p>');
   }
   h.push('</div>');
-  h.push('<div class="panel"><div class="eyebrow">Jogos</div><h2 class="ph">Minhas estatísticas</h2><div class="stats"><div class="stat"><b>0</b><span>Partidas</span></div><div class="stat"><b>0</b><span>Vitórias</span></div><div class="stat"><b>0</b><span>Pontos</span></div></div><p class="muted" style="margin-top:10px">As estatísticas começam a contar quando as mesas abrirem.</p></div>');
+  h.push('<div class="panel"><div class="eyebrow">Jogos</div><h2 class="ph">Minhas estatísticas</h2><div class="stats"><div class="stat"><b>'+meusStats().p+'</b><span>Partidas</span></div><div class="stat"><b>'+meusStats().v+'</b><span>Vitórias</span></div><div class="stat"><b>'+meusStats().pts+'</b><span>Pontuação</span></div></div><p class="muted" style="margin-top:10px">Veja o ranking completo na aba Ranking.</p></div>');
   return h.join("");
 }
 
@@ -981,7 +1080,7 @@ function doAct(action, quiet){
   }); }), 12000).then(function(res){
     S.sending = false;
     if(!res.ok){ if(!quiet) toast("A jogada não foi aceita: " + res.error.message); resync(); }
-    else { S.game = res.state; S.gameV = res.v; if(action.type === "PAUSE" || action.type === "RESUME") mesasCol().doc(S.mesaId).update({ pausada: action.type === "PAUSE" }).catch(function(){}); if(res.state.phase === "GAME_OVER") mesasCol().doc(S.mesaId).update({ status:"encerrada" }).catch(function(){}); }
+    else { S.game = res.state; S.gameV = res.v; if(action.type === "PAUSE" || action.type === "RESUME") mesasCol().doc(S.mesaId).update({ pausada: action.type === "PAUSE" }).catch(function(){}); if(res.state.phase === "GAME_OVER"){ mesasCol().doc(S.mesaId).update({ status:"encerrada" }).catch(function(){}); registrarPartida(res.state, S.lastMesa); } }
     S._forceRender = true; render();
   }).catch(function(){ S.sending = false; toast("Sem conexão: jogada não enviada. Tentando sincronizar…"); S.gameV = 0; resync(); S._forceRender = true; render(); });
 }
@@ -1345,6 +1444,10 @@ document.addEventListener("click", function(ev){
     case "pick-opt": pickOption(parseInt(id,10)); break;
     case "pick-cancel": S.picker = null; S._forceRender = true; render(); break;
     case "g-next": jogar("START_NEXT_ROUND"); break;
+    case "rk-view": S.rk.view = id; S._forceRender = true; render(); break;
+    case "rk-sort": S.rk.sort = id; S._forceRender = true; render(); break;
+    case "rk-dsort": S.rk.dsort = id; S._forceRender = true; render(); break;
+    case "rk-bots": S.rk.bots = !S.rk.bots; S._forceRender = true; render(); break;
     case "tab": setMsg(); S.tab = id; S._forceRender = true; render(); break;
     case "tab-reg": keepForm(); setMsg(); S.authTab = "reg"; render(); break;
     case "tab-login": keepForm(); setMsg(); S.authTab = "login"; render(); break;

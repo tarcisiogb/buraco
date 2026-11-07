@@ -33,6 +33,16 @@ service cloud.firestore {
       allow update, delete: if isMaster();
     }
 
+    // Partidas concluidas (ranking): quem jogou registra uma vez; so o Master apaga.
+    match /partidas/{pid} {
+      allow read: if isApproved();
+      allow create: if isApproved()
+        && request.resource.data.jogadores.size() == 4
+        && request.auth.uid in request.resource.data.jogadores;
+      allow update: if false;
+      allow delete: if isMaster();
+    }
+
     // Mesas de jogo: qualquer jogador aprovado cria, senta e le.
     match /mesas/{mid} {
       allow read: if isApproved();

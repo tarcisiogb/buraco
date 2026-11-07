@@ -802,5 +802,12 @@ test('partida salva antes da regra: vira vulnerável pelo placar atual e exige o
   const d = play(r, { type: 'DISCARD', player: 0, cardId: s.players[0].hand[3].id });
   assert.strictEqual(d.ok, false); assert.strictEqual(d.error.code, 'OPENING_INCOMPLETE');
 });
+test('histórico: cada rodada concluída entra em state.history (quem bateu, pontos)', () => {
+  let s = E.createGame({ seed: 3, config: { drawSeconds: 0, playSeconds: 0 } });
+  s.teams.A.mortoTaken = true; addMeld(s, 'A', '4S 5S 6S 7S 8S 9S 10S');
+  s.players[0].hand = K('3C'); s.phase = 'PLAYING'; s.turn = { player: 0, deadline: null, drewFrom: 'STOCK' };
+  const r = must(play(s, { type: 'DISCARD', player: 0, cardId: s.players[0].hand[0].id }));
+  assert.strictEqual(r.history.length, 1); assert.strictEqual(r.history[0].reason, 'BATIDA'); assert.strictEqual(r.history[0].by, 0);
+});
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);
