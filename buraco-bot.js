@@ -36,17 +36,17 @@
     if (!canStock) return { type: 'DRAW_DISCARD', player: me };
     if (!canDisc) return { type: 'DRAW_STOCK', player: me };
     if (E.topCardUsable(state, me)) return { type: 'DRAW_DISCARD', player: me };
-    // lixo grande: vale levar se várias cartas encaixam nos jogos da dupla
-    if (state.discard.length >= 5) {
-      let fits = 0;
-      for (const c of state.discard) if (team.melds.some((m) => E.findAddLayouts(m, c).length)) fits++;
-      if (fits >= 2) return { type: 'DRAW_DISCARD', player: me };
-      // ou se tem muitas cartas do mesmo naipe em sequência com o que já tenho
-      const hand = state.players[me].hand;
-      let seeds = 0;
-      for (const c of state.discard) if (hand.some((h) => h.suit === c.suit && near(h, c, 2))) seeds++;
-      if (seeds >= 4) return { type: 'DRAW_DISCARD', player: me };
+    // lixo: vale levar quando várias cartas dele servem (encaixam nos jogos, ou formam par/sequência com a mão)
+    const hand = state.players[me].hand, pile = state.discard;
+    let useful = 0;
+    for (const c of pile) {
+      if (team.melds.some((m) => E.findAddLayouts(m, c).length)) { useful += 2; continue; }
+      if (hand.some((h) => h.suit === c.suit && h.id !== c.id && near(h, c, 1))) useful++;
+      else if (pile.some((o) => o.id !== c.id && o.suit === c.suit && near(o, c, 1))) useful += 0.5;
     }
+    const need = pile.length >= 8 ? 1.5 : pile.length >= 4 ? 2.5 : 3;
+    if (useful >= need) return { type: 'DRAW_DISCARD', player: me };
+    if (pile.length >= 8) return { type: 'DRAW_DISCARD', player: me };
     return { type: 'DRAW_STOCK', player: me };
   }
 
@@ -57,10 +57,17 @@
 
   // ───────────── Jogadas na mesa ─────────────
 
+  /** Coringa só quando for para bater (ou em jogo pequeno, se a dupla já tem canastra limpa) */
+  function wildOk(state, me, newSize, action) {
+    const team = state.teams[teamOf(me)];
+    if (newSize <= 6 && hasCleanCanastra(team)) return true;
+    const ts = trial(state, action);
+    return !!(ts && ts.phase === 'ROUND_OVER' && ts.roundResult && ts.roundResult.reason === 'BATIDA');
+  }
+
   /** Cartas da mão que encaixam num jogo da dupla, sem gastar coringa à toa */
   function bestAdd(state, me) {
     const p = state.players[me], team = state.teams[teamOf(me)];
-    const cleanOk = hasCleanCanastra(team);
     let best = null;
     for (const meld of team.melds) {
       const size = meld.cards.length, before = wildCount(meld.cards);
@@ -70,10 +77,7 @@
         let oi = 0;
         lays.forEach((l, i) => { if (wildCount(l.entries) < wildCount(lays[oi].entries)) oi = i; });
         const lay = lays[oi], used = wildCount(lay.entries) - before; // coringas a mais
-        if (used > 0) {
-          const makesCanastra = size + 1 >= 7;
-          if (!((makesCanastra && (cleanOk || p.hand.length <= 4)) || p.hand.length <= 3)) continue;
-        }
+        if (used > 0 && !wildOk(state, me, size + 1, { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi })) continue;
         // prioridade: jogos grandes (rumo à canastra), sem gastar coringa
         const score = size * 2 - used * 20 + (size + 1 === 7 ? 6 : 0) + (c.rank === '2' ? -3 : 0);
         if (!best || score > best.score) best = { score, action: { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi } };
@@ -125,7 +129,7 @@
       }
     }
     // com um coringa (2) cobrindo um buraco — só se a mão estiver cheia
-    if (hand.length >= 7) {
+    if (hasCleanCanastra(state.teams[teamOf(me)]) || hand.length >= 9) {
       const twos = hand.filter((c) => c.rank === '2');
       if (twos.length) {
         for (const a of hand) for (const b of hand) {
@@ -190,8 +194,8 @@
       if (!lays.length) continue;
       let oi = 0;
       lays.forEach((l, i) => { if (wildCount(l.entries) < wildCount(lays[oi].entries)) oi = i; });
-      if (wildCount(lays[oi].entries) > wildCount(meld.cards)) continue;
       const a = { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi };
+      if (wildCount(lays[oi].entries) > wildCount(meld.cards) && !wildOk(state, me, meld.cards.length + 1, a)) continue;
       if (trial(state, a)) return a;
     }
     for (const c of chooseDiscards(state, me)) {
