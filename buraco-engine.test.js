@@ -809,5 +809,18 @@ test('histórico: cada rodada concluída entra em state.history (quem bateu, pon
   const r = must(play(s, { type: 'DISCARD', player: 0, cardId: s.players[0].hand[0].id }));
   assert.strictEqual(r.history.length, 1); assert.strictEqual(r.history[0].reason, 'BATIDA'); assert.strictEqual(r.history[0].by, 0);
 });
+test('histórico guarda canastras, bater sem coringa, maior lixo levado e vulnerável', () => {
+  let s = E.createGame({ seed: 3, config: { drawSeconds: 0, playSeconds: 0 } });
+  s.teams.A.mortoTaken = true; addMeld(s, 'A', '4S 5S 6S 7S 8S 9S 10S');
+  s.discard = K('3C 3D 3H 4C 4D 4H 5C 5D 5H 6C 6D');
+  s.players[0].hand = K('KC 9H'); s.phase = 'WAITING_TURN'; s.turn = { player: 0, deadline: null, drewFrom: null };
+  let r = must(play(s, { type: 'DRAW_DISCARD', player: 0 }));
+  assert.strictEqual(r.pile[0], 11);
+  r.players[0].hand = K('3C'); // sobra uma carta para bater
+  r = must(play(r, { type: 'DISCARD', player: 0, cardId: r.players[0].hand[0].id }));
+  const h = r.history[0];
+  assert.strictEqual(h.by, 0); assert.strictEqual(h.sem, true); assert.strictEqual(h.lixo, 11);
+  assert.strictEqual(h.cnt.A.limpa, 1); assert.strictEqual(h.vul.A, false);
+});
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);

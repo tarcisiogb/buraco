@@ -312,6 +312,7 @@
       B: { melds: [], mortoTaken: false, vulnerable: state.scores.B >= state.config.vulnerableAt, opened: !(state.scores.B >= state.config.vulnerableAt) }
     };
     state.opening = null;
+    state.pile = {};
     state.pendingRoundEnd = false;
     state.roundResult = null;
     state.winner = null;
@@ -431,6 +432,8 @@
     const p = cur(state);
     if (state.discard.length === 0) return fail('DISCARD_EMPTY', 'O lixo está vazio.');
     const taken = state.discard.length;
+    state.pile = state.pile || {};
+    state.pile[p.id] = Math.max(state.pile[p.id] || 0, taken); // maior lixo levado por jogador na rodada (medalhas)
     p.hand.push(...state.discard); // leva todas as cartas; sem exigir usar o topo (3.1)
     state.discard = [];
     state.phase = 'PLAYING';
@@ -609,7 +612,16 @@
       if (a > b) winner = 'A';
       else if (b > a) winner = 'B'; // empate na meta: segue para outra rodada
     }
-    state.history = (state.history || []).concat([{ round: state.round, reason, by, A: detail.A.total, B: detail.B.total }]);
+    const kinds = ['suja', 'limpa', 'c500', 'c1000'];
+    const cnt = {};
+    for (const t of ['A', 'B']) { cnt[t] = {}; for (const k of kinds) cnt[t][k] = (detail[t][k] && detail[t][k].count) || 0; }
+    const anyWild = batidaTeam ? state.teams[batidaTeam].melds.some((m) => m.cards.some((e) => e.wild)) : null;
+    state.history = (state.history || []).concat([{
+      round: state.round, reason, by, A: detail.A.total, B: detail.B.total,
+      cnt, sem: batidaTeam ? !anyWild : null,
+      lixo: by != null && state.pile ? (state.pile[by] || 0) : 0,
+      vul: { A: !!state.teams.A.vulnerable, B: !!state.teams.B.vulnerable }
+    }]);
     state.roundResult = { reason, by, detail, scoresAfter: { A: a, B: b } };
     state.pendingRoundEnd = false;
     state.winner = winner;

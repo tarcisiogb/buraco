@@ -287,6 +287,18 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .rk tr.me td{background:var(--gold-soft)}
 .rkn{display:inline-flex;align-items:center;gap:6px}
 .av.sm{width:24px;height:24px;font-size:10px;margin:0;cursor:default;flex:none}
+
+.medsum{display:flex;flex-wrap:wrap;gap:10px;margin:10px 6px 0;font-size:14px;align-items:center}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.medal{border:2px solid var(--line);border-radius:14px;padding:10px 9px;background:#fff;text-align:center}
+.medal .mi2{font-size:30px;line-height:1.1}.medal .mn{font-weight:800;font-size:13px;margin-top:4px;line-height:1.15}
+.medal .md{font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.25;min-height:28px}
+.medal .mbar{height:5px;border-radius:3px;background:#e8e6dc;margin-top:7px;overflow:hidden}.medal .mbar i{display:block;height:100%;background:var(--felt)}
+.medal .mst{font-size:11px;margin-top:5px}
+.medal.lock{filter:grayscale(1);opacity:.55}
+.medal.bronze{border-color:#cd7f32;background:#fbf0e4}.medal.bronze .mbar i{background:#cd7f32}
+.medal.silver{border-color:#9aa5b1;background:#f1f3f5}.medal.silver .mbar i{background:#9aa5b1}
+.medal.gold{border-color:#e6b422;background:#fff6d6;box-shadow:0 0 10px rgba(230,180,34,.45)}.medal.gold .mbar i{background:#e6b422}
 </style>
 </head>
 <body>
@@ -300,7 +312,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07i";
+var BUILD = "2026-11-07j";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -383,7 +395,8 @@ function registrarPartida(st, m){
     var bat = [0,0,0,0]; (st.history || []).forEach(function(h){ if(h.reason === "BATIDA" && h.by != null && bat[h.by] !== undefined) bat[h.by]++; });
     db.collection("partidas").doc(S.mesaId).set({
       jogadores: m.seats.slice(), vencedor: st.winner, rodadas: (st.history && st.history.length) || st.round || 1,
-      placar: { A: st.scores.A, B: st.scores.B }, batidas: bat, nome: m.nome || "", fim: firebase.firestore.FieldValue.serverTimestamp()
+      placar: { A: st.scores.A, B: st.scores.B }, batidas: bat,
+      rodadasDet: (st.history || []).map(function(h){ return { r:h.round, motivo:h.reason, by:(h.by == null ? -1 : h.by), A:h.A, B:h.B, cnt:h.cnt || null, sem:(h.sem == null ? null : h.sem), lixo:h.lixo || 0, vul:h.vul || null }; }), nome: m.nome || "", fim: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(function(){});
   }catch(e){}
 }
@@ -545,7 +558,8 @@ function viewRanking(){
   var mesList = Object.keys(meses).sort().reverse(); if(rk.mes !== "all" && !meses[rk.mes]) rk.mes = "all";
   var filtradas = rk.mes === "all" ? S.partidas : S.partidas.filter(function(m){ return mesKey(dataPartida(m)) === rk.mes; });
   var st = computeStats(filtradas);
-  h.push('<div class="seg"><button class="'+(rk.view==="jog"?"on":"")+'" data-action="rk-view" data-id="jog">Jogadores</button><button class="'+(rk.view==="dup"?"on":"")+'" data-action="rk-view" data-id="dup">Duplas</button></div>');
+  h.push('<div class="seg"><button class="'+(rk.view==="jog"?"on":"")+'" data-action="rk-view" data-id="jog">Jogadores</button><button class="'+(rk.view==="dup"?"on":"")+'" data-action="rk-view" data-id="dup">Duplas</button><button class="'+(rk.view==="med"?"on":"")+'" data-action="rk-view" data-id="med">Medalhas</button></div>');
+  if(rk.view === "med"){ viewMedalhas(h); h.push('</div>'); return h.join(""); }
   h.push('<label class="f" style="margin-top:12px">Período<select class="in" data-action="rk-mes"><option value="all"'+(rk.mes==="all"?" selected":"")+'>Geral (histórico completo)</option>'+mesList.map(function(k){ return '<option value="'+k+'"'+(rk.mes===k?" selected":"")+'>'+esc(mesLabel(k))+'</option>'; }).join("")+'</select></label>');
   if(!filtradas.length){ h.push('<p class="muted" style="margin-top:14px">Nenhuma partida neste período.</p></div>'); return h.join(""); }
   if(!S.partidas.length){ h.push('<p class="muted" style="margin-top:14px">Nenhuma partida concluída ainda. O ranking começa a contar quando uma partida chega ao fim (encerramento antecipado não conta).</p></div>'); return h.join(""); }
@@ -574,6 +588,103 @@ function viewRanking(){
   return h.join("");
 }
 function meusStats(){ var st = computeStats(S.partidas || []), uid = S.user && S.user.uid, me = null; st.jog.forEach(function(s){ if(s.id === uid) me = s; }); return me || { p:0, v:0, q:0, pts:0, maos:0, bat:0 }; }
+
+/* ── medalhas ── */
+var MEDALHAS = [
+  { id:"primeira", ic:"🏆", nome:"Primeira vitória", desc:"Vença uma partida", t:[1] },
+  { id:"seq", ic:"🔥", nome:"Em chamas", desc:"Vitórias seguidas", t:[3,5,10] },
+  { id:"bat", ic:"🎯", nome:"Batedor", desc:"Batidas no total", t:[5,20,50] },
+  { id:"fiel", ic:"🤝", nome:"Dupla fiel", desc:"Partidas com o mesmo parceiro", t:[10,25,50] },
+  { id:"caca", ic:"🤖", nome:"Caça-robôs", desc:"Vitórias com os dois adversários bots", t:[1,5,15] },
+  { id:"solo", ic:"🦸", nome:"Sozinho contra todos", desc:"Vitórias como único humano da mesa", t:[1,3,10] },
+  { id:"sem", ic:"📅", nome:"Presença", desc:"Semanas seguidas jogando", t:[2,4,8] },
+  { id:"rei", ic:"👑", nome:"Rei do mês", desc:"Meses fechados em 1º no ranking", t:[1,3,6] },
+  { id:"virada", ic:"💪", nome:"Virada", desc:"Vencer logo após uma derrota com o mesmo parceiro", t:[1,5,10] },
+  { id:"c1000", ic:"⭐", nome:"Ás a Ás", desc:"Canastras de 1.000 da sua dupla", t:[1,3,10] },
+  { id:"c500", ic:"✨", nome:"Canastra de 500", desc:"Canastras de 13 cartas limpas da sua dupla", t:[1,3,10] },
+  { id:"limpa", ic:"🧼", nome:"Batida limpa", desc:"Bater sem nenhum coringa nos jogos", t:[1,5,15] },
+  { id:"epico", ic:"💯", nome:"Placar épico", desc:"Vitórias com mais de 3.500 pontos", t:[1,3,10] },
+  { id:"aperta", ic:"⚖️", nome:"Vitória apertada", desc:"Vitórias por menos de 100 pontos", t:[1,3,10] },
+  { id:"vulv", ic:"🛡️", nome:"Vulnerável e vencedor", desc:"Vencer tendo ficado vulnerável", t:[1,3,10] },
+  { id:"lixo", ic:"🧹", nome:"Limpa-lixo", desc:"Levar um lixo de 10+ cartas e bater na rodada", t:[1,3,10] }
+];
+function semanaIdx(d){ return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5 + 3) / 7); }
+function computeMedals(list){
+  var ps = (list || []).filter(function(m){ return m.jogadores && m.jogadores.length === 4 && m.vencedor; }).slice();
+  ps.sort(function(a,b){ return dataPartida(a) - dataPartida(b); });
+  var M = {};
+  function X(id){ return M[id] || (M[id] = { primeira:0, seq:0, bat:0, fiel:0, caca:0, solo:0, sem:0, rei:0, virada:0, c1000:0, c500:0, limpa:0, epico:0, aperta:0, vulv:0, lixo:0, _cur:0, _wk:{}, _p:0, _v:0 }); }
+  var last = {}, pairN = {};
+  ps.forEach(function(m){
+    var d = dataPartida(m), wk = semanaIdx(d), pts = m.placar || {}, diff = Math.abs((pts.A||0) - (pts.B||0));
+    for(var i=0;i<4;i++){
+      var id = m.jogadores[i]; if(!id || isBot(id)) continue;
+      var t = i % 2 === 0 ? "A" : "B", o = t === "A" ? "B" : "A", x = X(id), win = t === m.vencedor;
+      x._p++; x._wk[wk] = 1;
+      var par = m.jogadores[(i + 2) % 4], ops = t === "A" ? [m.jogadores[1], m.jogadores[3]] : [m.jogadores[0], m.jogadores[2]];
+      var humans = m.jogadores.filter(function(u){ return u && !isBot(u); }).length;
+      var key = [id, par].sort().join("|"), pk = id + ">" + par;
+      pairN[pk] = (pairN[pk] || 0) + 1; x.fiel = Math.max(x.fiel, pairN[pk]);
+      if(win){
+        x._v++; x._cur++; x.seq = Math.max(x.seq, x._cur);
+        if(isBot(ops[0]) && isBot(ops[1])) x.caca++;
+        if(humans === 1) x.solo++;
+        if(pts[t] > 3500) x.epico++;
+        if(diff < 100) x.aperta++;
+        if(m.rodadasDet && m.rodadasDet.some(function(r){ return r.vul && r.vul[t]; })) x.vulv++;
+        if(last[pk] === "L") x.virada++;
+      } else x._cur = 0;
+      last[pk] = win ? "W" : "L";
+      (m.rodadasDet || []).forEach(function(r){
+        if(r.cnt && r.cnt[t]){ x.c1000 += r.cnt[t].c1000 || 0; x.c500 += r.cnt[t].c500 || 0; }
+        if(r.motivo === "BATIDA" && r.by === i){ x.bat++; if(r.sem === true) x.limpa++; if((r.lixo || 0) >= 10) x.lixo++; }
+      });
+      if(!m.rodadasDet) x.bat += (m.batidas && m.batidas[i]) || 0;
+    }
+  });
+  Object.keys(M).forEach(function(id){
+    var x = M[id], ws = Object.keys(x._wk).map(Number).sort(function(a,b){ return a-b; }), run = 0, best = 0;
+    ws.forEach(function(w, k){ run = (k > 0 && w === ws[k-1] + 1) ? run + 1 : 1; if(run > best) best = run; });
+    x.sem = best; x.primeira = x._v > 0 ? 1 : 0;
+  });
+  // rei do mês: 1º lugar (entre humanos) de cada mês já fechado
+  var atual = mesKey(new Date()), porMes = {};
+  ps.forEach(function(m){ var k = mesKey(dataPartida(m)); (porMes[k] = porMes[k] || []).push(m); });
+  Object.keys(porMes).forEach(function(k){
+    if(k >= atual) return;
+    var j = computeStats(porMes[k]).jog.filter(function(s){ return !isBot(s.id); });
+    j.sort(function(a,b){ return b.pts - a.pts || b.v - a.v || a.p - b.p; });
+    if(j.length && X(j[0].id)) X(j[0].id).rei++;
+  });
+  return M;
+}
+function medalLevel(def, val){ var n = 0; def.t.forEach(function(t){ if(val >= t) n++; }); return n; }
+function medalSummary(x){ var o = { b:0, p:0, o:0, total:0 }; if(!x) return o; MEDALHAS.forEach(function(d){ var l = medalLevel(d, x[d.id] || 0), tiers = d.t.length;
+  if(l >= 1){ o.total++; if(tiers === 1){ o.o++; } else { var tier = l === tiers ? "o" : l === 1 ? "b" : "p"; o[tier]++; } } }); o.pts = o.b + 2*o.p + 3*o.o; return o; }
+function viewMedalhas(h){
+  var M = computeMedals(S.partidas || []), uid = S.rk.medUid || (S.user && S.user.uid);
+  var humanos = S.players.filter(function(p){ return p.status === "aprovado"; }).sort(porApelido);
+  h.push('<label class="f" style="margin-top:12px">Jogador<select class="in" data-action="rk-medjog">'+humanos.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===uid?" selected":"")+'>'+esc(p.apelido||primeiro(p.nome))+'</option>'; }).join("")+'</select></label>');
+  var x = M[uid] || {}, sm = medalSummary(M[uid]);
+  h.push('<div class="medsum"><span>🥇 '+sm.o+'</span><span>🥈 '+sm.p+'</span><span>🥉 '+sm.b+'</span><span><b>'+sm.total+'</b>/'+MEDALHAS.length+' conquistadas</span></div>');
+  h.push('<div class="mgrid">');
+  MEDALHAS.forEach(function(d){
+    var v = x[d.id] || 0, l = medalLevel(d, v), tiers = d.t.length, nxt = l < tiers ? d.t[l] : null;
+    var cls = l === 0 ? "lock" : (tiers === 1 || l === tiers) ? "gold" : l === 1 ? "bronze" : "silver";
+    var lab = l === 0 ? "Bloqueada" : (tiers === 1 ? "Conquistada" : l === tiers ? "Ouro" : l === 1 ? "Bronze" : "Prata");
+    var pct = nxt ? Math.min(100, Math.round(v / nxt * 100)) : 100;
+    h.push('<div class="medal '+cls+'"><div class="mi2">'+d.ic+'</div><div class="mn">'+esc(d.nome)+'</div><div class="md">'+esc(d.desc)+'</div><div class="mbar"><i style="width:'+pct+'%"></i></div><div class="mst"><b>'+lab+'</b> · '+(nxt ? v+"/"+nxt : v)+'</div></div>');
+  });
+  h.push('</div>');
+  var ids = Object.keys(M).map(function(id){ var s = medalSummary(M[id]); s.id = id; return s; }).filter(function(s){ return s.total > 0; });
+  ids.sort(function(a,b){ return b.pts - a.pts || b.o - a.o || b.total - a.total; });
+  h.push('<div class="eyebrow" style="margin-top:18px;padding-left:6px">Quadro de medalhas</div>');
+  if(!ids.length) h.push('<p class="muted" style="margin:8px 6px 0">Ninguém conquistou medalha ainda. Joguem!</p>');
+  else { h.push('<div class="rkwrap"><table class="rk"><tr><th>#</th><th class="l">Jogador</th><th>🥇</th><th>🥈</th><th>🥉</th><th>Medalhas</th></tr>');
+    ids.forEach(function(s, i){ h.push('<tr class="'+(S.user && s.id===S.user.uid?"me":"")+'"><td>'+(i+1)+'</td><td class="l"><span class="rkn">'+avatarRk(s.id)+'<span>'+esc(nomeJogador(s.id))+'</span></span></td><td>'+s.o+'</td><td>'+s.p+'</td><td>'+s.b+'</td><td><b>'+s.total+'</b></td></tr>'); });
+    h.push('</table></div>'); }
+  h.push('<p class="muted" style="margin:10px 6px 0;font-size:12px">As medalhas valem para todo o histórico. As de canastra, batida limpa, limpa-lixo e vulnerável só contam partidas jogadas depois que o app passou a registrar esses detalhes.</p>');
+}
 function viewApp(){
   if(S.mesaId){ var mv = viewMesa(); if(mv) return mv; }
   var pend = isMaster() ? S.players.filter(function(p){ return p.status === "pendente"; }).length : 0;
@@ -633,7 +744,7 @@ function viewPerfil(){
     h.push('<p class="muted" style="margin-top:6px">Sua conta usa o login do Google, então não há senha para trocar aqui.</p>');
   }
   h.push('</div>');
-  h.push('<div class="panel"><div class="eyebrow">Jogos</div><h2 class="ph">Minhas estatísticas</h2><div class="stats"><div class="stat"><b>'+meusStats().p+'</b><span>Partidas</span></div><div class="stat"><b>'+meusStats().v+'</b><span>Vitórias</span></div><div class="stat"><b>'+meusStats().pts+'</b><span>Pontuação</span></div></div><p class="muted" style="margin-top:10px">Veja o ranking completo na aba Ranking.</p></div>');
+  h.push('<div class="panel"><div class="eyebrow">Jogos</div><h2 class="ph">Minhas estatísticas</h2><div class="stats"><div class="stat"><b>'+meusStats().p+'</b><span>Partidas</span></div><div class="stat"><b>'+meusStats().v+'</b><span>Vitórias</span></div><div class="stat"><b>'+meusStats().pts+'</b><span>Pontuação</span></div></div><p class="muted" style="margin-top:10px">🏅 Medalhas conquistadas: <b>'+medalSummary(computeMedals(S.partidas||[])[S.user.uid]).total+'</b>/'+MEDALHAS.length+' · veja tudo na aba Ranking.</p></div>');
   return h.join("");
 }
 
@@ -1414,7 +1525,9 @@ document.addEventListener("pointerup", dragEnd);
 document.addEventListener("pointercancel", dragEnd);
 window.addEventListener("pointerup", dragEnd);
 document.addEventListener("change", function(ev){
-  var el = ev.target; if(el && el.getAttribute && el.getAttribute("data-action") === "rk-mes"){ S.rk.mes = el.value; S._forceRender = true; render(); }
+  var el = ev.target, da = el && el.getAttribute && el.getAttribute("data-action");
+  if(da === "rk-mes"){ S.rk.mes = el.value; S._forceRender = true; render(); }
+  else if(da === "rk-medjog"){ S.rk.medUid = el.value; S._forceRender = true; render(); }
 });
 document.addEventListener("click", function(ev){
   if(S.noClickUntil && Date.now() < S.noClickUntil && ev.target.closest && ev.target.closest(".hrow")){ ev.stopPropagation(); return; }
