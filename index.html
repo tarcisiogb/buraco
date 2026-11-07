@@ -260,6 +260,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .band .mortos{margin:0}
 .sc.vul{border-color:#d33;color:#b21d1d;font-weight:800}
 .sc.me.vul{background:#b21d1d;color:#fff;border-color:#b21d1d}
+.rg{border-bottom:1px solid var(--line);padding:6px 0}.rg summary{font-weight:700;cursor:pointer;padding:4px 0}.rg div{font-size:13px;line-height:1.45}.rg p{margin:6px 0}
 .histlist{margin-top:8px;max-height:60vh;overflow:auto;font-size:13px}
 .histlist div{padding:6px 2px;border-bottom:1px solid var(--line)}
 .zoomwrap{display:flex;flex-wrap:wrap;gap:4px;--cw:34px}
@@ -313,7 +314,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07p";
+var BUILD = "2026-11-07q";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -692,15 +693,28 @@ function viewApp(){
   var h = ['<div class="wrap">'];
   h.push('<div class="topbar"><div class="who">'+avatar(S.me)+'<div><div class="name">'+esc(nomeExib(S.me))+'</div><div class="sub">'+(isMaster()?"Master":"Jogador")+'</div></div></div><button class="btn ghost small" data-action="logout">Sair</button></div>');
   h.push('<div class="tabs" role="tablist">');
-  h.push(tabBtn("inicio","Início")); h.push(tabBtn("ranking","Ranking")); h.push(tabBtn("perfil","Meu cadastro"));
+  h.push(tabBtn("inicio","Início")); h.push(tabBtn("ranking","Ranking")); h.push(tabBtn("regras","Regras")); h.push(tabBtn("perfil","Meu cadastro"));
   if(isMaster()) h.push(tabBtn("admin","Administração", pend));
   h.push('</div>');
-  if(S.tab === "ranking") h.push(viewRanking());
+  if(S.tab === "regras") h.push('<div class="card">'+regrasHtml()+'</div>'); else if(S.tab === "ranking") h.push(viewRanking());
   else if(S.tab === "perfil") h.push(viewPerfil());
   else if(S.tab === "admin" && isMaster()) h.push(viewAdmin());
   else h.push(viewInicio());
   h.push('</div>');
   return h.join("");
+}
+function regrasHtml(){
+  var D=function(t,b,o){return '<details class="rg"'+(o?' open':'')+'><summary>'+t+'</summary><div>'+b+'</div></details>';};
+  return '<h3 style="margin:0 0 8px">Regras do Buraco</h3>'+
+  D('Objetivo e valor das cartas','<p>4 jogadores, 2 duplas (parceiros sentam em frente). Vence a dupla que chegar primeiro a <b>3.000 pontos</b> (se as duas passarem na mesma rodada, vence a maior).</p><p>Ás = 15 · K, Q, J, 10, 9, 8 = 10 · 2 = 10 · 3 a 7 = 5.</p><p>2 baralhos (104 cartas), 11 cartas para cada um, 2 mortos de 11 sem dono, monte de 38. O lixo começa vazio.</p>',1)+
+  D('Turno','<p>1) <b>Comprar</b>: 1 carta do monte ou <b>todo o lixo</b>.<br>2) <b>Baixar/adicionar</b> (opcional).<br>3) <b>Descartar</b> 1 carta.</p><p>Não pode deixar a mão vazia (baixando, adicionando ou descartando), a não ser que pegue o morto ou bata.</p>')+
+  D('Jogos','<p>Jogo = sequência de <b>3+ cartas do mesmo naipe</b>. Ás vale baixo (A-2-3) e alto (Q-K-A), mas a sequência não dá a volta (K-A-2 não vale). Máximo 14 cartas. Não existe trinca. Jogos nunca se unem e cartas baixadas não saem.</p><p>Novo jogo: 3+ cartas de uma vez. Adicionar a jogo existente: uma carta por vez (pode selecionar várias e tocar no jogo).</p><p><b>O 2</b>: do mesmo naipe na posição natural (depois do Ás, ou no início) é carta normal. Em qualquer outro lugar ou naipe é <b>coringa</b>, no máximo 1 por jogo. O coringa pode ser reposicionado no mesmo jogo quando a carta real chega. Jogo com coringa é <b>sujo</b>; sem, <b>limpo</b>.</p>')+
+  D('Canastras','<p>Jogo com 7+ cartas:<br>Limpa <b>+200</b> · Suja <b>+100</b><br>13 cartas limpa (A→K ou 2→A) <b>+500</b><br>14 cartas limpa (A→A) <b>+1.000</b></p>')+
+  D('Morto, monte e lixo','<p>Quem esvazia a mão primeiro pega um morto (11 cartas); a outra dupla pode pegar o que sobrou. Cada dupla pega só 1.</p><p>Em pé (sem descartar): pega o morto e continua o turno. Descartando a última carta: joga só no próximo turno.</p><p>Se o monte acaba, um morto restante vira monte (sorteado se houver dois). Sem morto para virar monte, a rodada termina.</p>')+
+  D('Batida','<p>Bate quem fica sem cartas tendo <b>canastra limpa</b> e (pegou o morto <b>ou</b> não há mais morto na mesa). Sem ter pego o morto, a dupla leva −100 do morto e +100 da batida. Bater encerra a rodada: <b>+100</b>.</p>')+
+  D('Pontuação da rodada','<p>cartas nos jogos + canastras + 100 (bateu) − cartas na mão − 100 (não pegou o morto).</p>')+
+  D('Dupla vulnerável','<p>Quem começa a rodada com <b>1.500+</b> pontos precisa abrir com <b>75 pontos</b> em cartas (vários jogos no mesmo turno somam; bônus não contam). Enquanto não chega a 75 a descida é provisória: não descarta nem esvazia a mão, e pode ser desfeita.</p>')+
+  D('Pausa, encerramento e bots','<p>Qualquer jogador pausa; a partida fica salva e pode ser retomada depois. Para encerrar antes da meta, os 4 precisam aceitar (ou o administrador encerra): a partida é cancelada, sem vencedor.</p><p>Bots seguem as mesmas regras e veem só o que um jogador veria.</p>');
 }
 function tabBtn(id, label, dot){ return '<button class="tab'+(S.tab===id?" on":"")+'" role="tab" data-action="tab" data-id="'+id+'">'+label+(dot?'<span class="dot"></span>':"")+'</button>'; }
 
@@ -897,7 +911,7 @@ function listenMesas(){
 }
 function stopMesas(){ if(unsubMesas){ unsubMesas(); unsubMesas = null; } S.mesas = null; stopGame(); S.mesaId = null; }
 
-function stopGame(){ if(unsubGame){ unsubGame(); unsubGame = null; } gameFor = null; S.game = null; S.gameV = 0; S.sel = []; S.picker = null; S.lastN = null; S.anims = []; S.sending = false; S.menu = false; S.zoom = null; S.hist = null; }
+function stopGame(){ if(unsubGame){ unsubGame(); unsubGame = null; } gameFor = null; S.game = null; S.gameV = 0; S.sel = []; S.picker = null; S.lastN = null; S.anims = []; S.sending = false; S.menu = false; S.zoom = null; S.hist = null; S.rules = false; }
 function ensureGameListener(){
   var m = mesaAtual();
   if(S.mesaId && m && m.status !== "aguardando" && mySeat(m) >= 0 && gameFor !== S.mesaId) startGameListener(S.mesaId);
@@ -1400,7 +1414,7 @@ function gameHtml(m, me){
   var h = ['<div class="gscreen'+(myTurn?" mt":"")+'">'];
   h.push('<div class="gtop"><button class="iconbtn" data-action="mesa-back" title="Voltar às mesas">‹</button><div class="score"><span class="sc me'+(g.teams[team].vulnerable?" vul":"")+'">Nós <b>'+g.scores[team]+'</b>'+(g.teams[team].vulnerable?' ⚠':"")+'</span><span class="sc'+(g.teams[opp].vulnerable?" vul":"")+'">Eles <b>'+g.scores[opp]+'</b>'+(g.teams[opp].vulnerable?' ⚠':"")+'</span></div>'+
     (S.offline?'<span class="badgeoff">offline</span>':"")+
-    '<button class="iconbtn'+(MUTED?"":" on")+'" data-action="g-mute" title="Som">'+(MUTED?"🔇":"🔊")+'</button><button class="iconbtn" data-action="g-pause" title="Pausar">⏸</button><button class="iconbtn" data-action="g-menu" title="Mais">⋯</button></div>');
+    '<button class="iconbtn'+(MUTED?"":" on")+'" data-action="g-mute" title="Som">'+(MUTED?"🔇":"🔊")+'</button><button class="iconbtn" data-action="g-pause" title="Pausar">⏸</button><button class="iconbtn" data-action="g-rules" title="Regras">?</button><button class="iconbtn" data-action="g-menu" title="Mais">⋯</button></div>');
   var vs = [];
   if(g.teams[team].vulnerable) vs.push(g.teams[team].opened ? "Nós: aberta ✓" : "<b>NÓS VULNERÁVEIS</b>: primeira descida precisa de "+g.config.openMin+" pontos");
   if(g.teams[opp].vulnerable) vs.push(g.teams[opp].opened ? "Eles: aberta ✓" : "<b>ELES VULNERÁVEIS</b> ("+g.config.openMin+" pts)");
@@ -1443,6 +1457,7 @@ function gameHtml(m, me){
   if(S.hist){ var hl = (g.log||[]).slice().reverse().map(function(e){ var t = logTxt(g, e); return t ? '<div>'+esc(t)+(e.type==="DISCARDED"?' '+'<span class="inl" style="--cw:18px;display:inline-flex;vertical-align:middle">'+cardHtml(e.card,"")+'</span>':"")+'</div>' : ""; }).join("").split("</div>").slice(0,10).join("</div>"); out += '<div class="modalbg" data-action="close-hist"><div class="modal wide" data-stop="1"><h3>Últimas jogadas</h3><div class="histlist">'+hl+'</div><button class="btn ghost" data-action="close-hist">Fechar</button></div></div>'; }
   if(S.picker) out += pickerHtml();
   if(g.paused && g.phase !== "GAME_OVER") out += '<div class="modalbg"><div class="modal"><div style="font-size:42px">⏸</div><h3>Jogo pausado</h3><p class="muted" style="margin-top:6px">'+esc(g.players[g.paused.by].name)+' pausou a partida.</p><button class="btn" data-action="g-resume">Continuar</button><button class="btn ghost" data-action="mesa-back">Sair e voltar depois</button><p class="muted" style="margin-top:8px;font-size:12px">A partida fica salva: dá para retomar em outro momento.</p></div></div>';
+  if(S.rules) out += '<div class="modalbg" data-action="close-rules"><div class="modal wide" data-stop="1" style="max-height:85vh;overflow:auto">'+regrasHtml()+'<button class="btn ghost" data-action="close-rules">Fechar</button></div></div>';
   if(S.menu) out += '<div class="modalbg" data-action="close-menu"><div class="modal wide" data-stop="1"><h3>Mais opções</h3><button class="btn ghost" data-action="g-propose-end"'+(g.endVote?" disabled":"")+'>Propor encerrar a partida</button>'+(canForceEnd(m)?'<button class="btn danger" data-action="g-end-now">Encerrar agora (administrador)</button>':"")+'<button class="btn ghost" data-action="close-menu">Fechar</button></div></div>';
   if(g.phase==="ROUND_OVER" || g.phase==="GAME_OVER") out += endHtml(g, team, opp);
   if(S.toast) out += '<div class="toast">'+esc(S.toast)+'</div>';
@@ -1586,7 +1601,7 @@ document.addEventListener("change", function(ev){
 document.addEventListener("click", function(ev){
   if(S.noClickUntil && Date.now() < S.noClickUntil && ev.target.closest && ev.target.closest(".hrow")){ ev.stopPropagation(); return; }
   var el = ev.target.closest("[data-action]"); if(!el) return;
-  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
+  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist" || da0 === "close-rules") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
   var act = el.getAttribute("data-action"), id = el.getAttribute("data-id");
   switch(act){
     case "reload": location.reload(); break;
@@ -1609,6 +1624,8 @@ document.addEventListener("click", function(ev){
     case "g-pause": jogar("PAUSE"); break;
     case "g-resume": jogar("RESUME"); break;
     case "hist": S.hist = true; S._forceRender = true; render(); break;
+    case "g-rules": S.rules = true; S._forceRender = true; render(); break;
+    case "close-rules": S.rules = false; S._forceRender = true; render(); break;
     case "close-hist": S.hist = null; S._forceRender = true; render(); break;
     case "g-undo": jogar("UNDO_OPENING"); break;
     case "zoom-melds": S.zoom = id; S._forceRender = true; render(); break;
