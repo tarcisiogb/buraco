@@ -202,9 +202,10 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="buraco-engine.js"></script>
+<script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-06e";
+var BUILD = "2026-11-07a";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -327,6 +328,7 @@ function render(){
   app.innerHTML = h + (S.modal ? modalHtml() : "") + (S._inGame ? "" : '<div class="build">Buraco da Família · build '+BUILD+'</div>');
   document.body.classList.toggle("ingame", !!S._inGame);
   if(S._inGame){ layoutFans(); fitMelds(); runAnims(); }
+  if(S._inGame && S.game !== botSeen){ botSeen = S.game; botDrive(); }
 }
 function viewLoading(){ return '<div class="loading"><div><div class="spin"></div><p style="margin-top:12px">Carregando…</p></div></div>'; }
 function viewOffline(){ return '<div class="wrap auth">'+brand()+'<div class="msg err">Não consegui carregar o Firebase. Verifique sua conexão e recarregue a página.</div><button class="btn" data-action="reload">Recarregar</button></div>'; }
@@ -576,7 +578,10 @@ function mesasCol(){ return db.collection("mesas"); }
 function estadoRef(mid){ return mesasCol().doc(mid).collection("estado").doc("atual"); }
 function mesaAtual(){ if(!S.mesas) return null; for(var i=0;i<S.mesas.length;i++) if(S.mesas[i].id===S.mesaId) return S.mesas[i]; return null; }
 function mySeat(m){ return (m && S.user && m.seats) ? m.seats.indexOf(S.user.uid) : -1; }
-function playerByUid(uid){ for(var i=0;i<S.players.length;i++) if(S.players[i].id===uid) return S.players[i]; return null; }
+var BOT_NAMES = ["Rubi","Teo","Lia","Max"];
+function isBot(uid){ return typeof uid === "string" && uid.indexOf("bot:") === 0; }
+function botPlayer(uid){ var n = BOT_NAMES[parseInt(uid.slice(4),10)] || "Bot"; return { id:uid, nome:"Robô "+n, apelido:n, foto:"", bot:true }; }
+function playerByUid(uid){ if(isBot(uid)) return botPlayer(uid); for(var i=0;i<S.players.length;i++) if(S.players[i].id===uid) return S.players[i]; return null; }
 function seatName(m, i){ var p = m.seats[i] ? playerByUid(m.seats[i]) : null; return p ? (p.apelido || primeiro(p.nome)) : (m.seats[i] ? "…" : ""); }
 function toast(txt){ S.toast = txt; S._forceRender = true; render(); clearTimeout(toast._t); toast._t = setTimeout(function(){ S.toast = null; S._forceRender = true; render(); }, 3200); }
 function toastErr(e){ toast((e && (e.message || e.code)) || "Algo deu errado."); }
@@ -614,6 +619,16 @@ function sitAt(idx){
     var seats = m.seats.slice(); if(seats[idx] && seats[idx] !== uid) throw {message:"Esse lugar já foi ocupado."};
     for(var i=0;i<4;i++) if(seats[i] === uid) seats[i] = null;
     seats[idx] = uid; tx.update(ref, {seats:seats});
+  }); }).catch(toastErr);
+}
+function setBot(idx, on){
+  var ref = mesasCol().doc(S.mesaId);
+  db.runTransaction(function(tx){ return tx.get(ref).then(function(d){
+    if(!d.exists) return; var m = d.data(); if(m.status !== "aguardando") throw {message:"A partida já começou."};
+    var seats = m.seats.slice();
+    if(on){ if(seats[idx]) throw {message:"Esse lugar já foi ocupado."}; seats[idx] = "bot:" + idx; }
+    else if(isBot(seats[idx])) seats[idx] = null;
+    tx.update(ref, {seats:seats});
   }); }).catch(toastErr);
 }
 function standUp(){
@@ -664,7 +679,7 @@ function mesasPanel(){
   h.push('</div>');
   return h.join("");
 }
-function avatarMini(p){ return '<div class="av">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':esc(initials(p.nome)))+'</div>'; }
+function avatarMini(p){ if(p.bot) return '<div class="av">🤖</div>'; return '<div class="av">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':esc(initials(p.nome)))+'</div>'; }
 
 /* ── telas: mesa ── */
 function viewMesa(){
@@ -685,8 +700,10 @@ function lobbyHtml(m){
   var me = mySeat(m), full = m.seats.every(function(x){ return x; }), canStart = full && (m.criadoPor === S.user.uid || isMaster());
   function seat(i){
     var p = m.seats[i] ? playerByUid(m.seats[i]) : null, mine = i === me, tm = i % 2 === 0 ? "ta" : "tb";
+    var adm = m.criadoPor === S.user.uid || isMaster();
+    if(p && p.bot) return '<div class="seat taken '+tm+'"><div>'+avatarMini(p)+'<div class="nm">'+esc(p.apelido)+'</div>'+(adm?'<button class="btn ghost mini" style="margin-top:6px" data-action="rm-bot" data-id="'+i+'">Tirar</button>':"")+'</div></div>';
     if(p) return '<div class="seat taken '+tm+(mine?" mine":"")+'" '+(mine?'data-action="stand" ':"")+'>'+'<div>'+avatarMini(p)+'<div class="nm">'+esc(p.apelido||primeiro(p.nome))+(mine?'<br><span class="tm">toque p/ levantar</span>':"")+'</div></div></div>';
-    return '<div class="seat '+tm+'" data-action="sit" data-id="'+i+'"><div>Sentar aqui<div class="tm">Dupla '+(i%2===0?"1":"2")+'</div></div></div>';
+    return '<div class="seat '+tm+'" data-action="sit" data-id="'+i+'"><div>Sentar aqui<div class="tm">Dupla '+(i%2===0?"1":"2")+'</div>'+(adm?'<button class="btn ghost mini" style="margin-top:8px" data-action="add-bot" data-id="'+i+'">🤖 Bot</button>':"")+'</div></div>';
   }
   var h = ['<div class="wrap"><div class="gtop"><button class="btn ghost mini" data-action="mesa-back">‹ Mesas</button><span class="muted">'+esc(m.nome||"Mesa")+'</span></div>'];
   h.push('<div class="panel"><div class="eyebrow">Mesa</div><h2 class="ph">Escolha seu lugar</h2><p class="muted" style="margin-top:6px">Quem senta na frente é seu parceiro: <b>Dupla 1</b> (azul) e <b>Dupla 2</b> (laranja) jogam uma contra a outra.</p>');
@@ -828,11 +845,11 @@ function startGameListener(mid){
 }
 
 /* ── jogadas ── */
-function doAct(action){
-  if(S.sending){ toast("Enviando a jogada anterior…"); return; }
+function doAct(action, quiet){
+  if(S.sending){ if(!quiet) toast("Enviando a jogada anterior…"); return; }
   var g = S.game, m = S.lastMesa, me = mySeat(m);
   var r = E.applyAction(g, action, Date.now());
-  if(!r.ok){ toast(r.error.message); return; }
+  if(!r.ok){ if(!quiet) toast(r.error.message); return; }
   var prev = g; S.game = r.state; S.gameV = (S.gameV || 0) + 1; S.sel = []; S.picker = null; S.menu = false;
   processLog(prev, r.state, me);
   S.sending = true; S._forceRender = true; render();
@@ -843,10 +860,32 @@ function doAct(action){
     tx.set(ref, { json:JSON.stringify(rr.state), v:v }); return { ok:true, state:rr.state, v:v };
   }); }), 12000).then(function(res){
     S.sending = false;
-    if(!res.ok){ toast("A jogada não foi aceita: " + res.error.message); resync(); }
+    if(!res.ok){ if(!quiet) toast("A jogada não foi aceita: " + res.error.message); resync(); }
     else { S.game = res.state; S.gameV = res.v; if(action.type === "PAUSE" || action.type === "RESUME") mesasCol().doc(S.mesaId).update({ pausada: action.type === "PAUSE" }).catch(function(){}); if(res.state.phase === "GAME_OVER") mesasCol().doc(S.mesaId).update({ status:"encerrada" }).catch(function(){}); }
     S._forceRender = true; render();
   }).catch(function(){ S.sending = false; toast("Sem conexão: jogada não enviada. Tentando sincronizar…"); S.gameV = 0; resync(); S._forceRender = true; render(); });
+}
+/* ── bots: o celular de um humano sentado joga pelos bots; os demais assumem se ele sumir ── */
+var botTimer = null, botSeen = null;
+function botDrive(){
+  var g = S.game, m = S.lastMesa;
+  if(!g || !m || !S.user || !window.BuracoBot) return;
+  var me = mySeat(m); if(me < 0) return;
+  var bots = [], humans = [];
+  m.seats.forEach(function(u, i){ if(isBot(u)) bots.push(i); else if(u) humans.push(i); });
+  if(!bots.length) return;
+  var act; try{ act = BuracoBot.pendingAction(g, bots); }catch(e){ act = null; }
+  clearTimeout(botTimer); botTimer = null;
+  if(!act) return;
+  var rank = Math.max(0, humans.indexOf(me));
+  var delay = act.type === "VOTE_END" ? 500 : (g.phase === "WAITING_TURN" ? 1500 : 1000);
+  delay += rank * 3500;
+  botTimer = setTimeout(function(){
+    botTimer = null;
+    if(S.sending || S.game !== g){ botSeen = null; botDrive(); return; }
+    var a2; try{ a2 = BuracoBot.pendingAction(S.game, bots); }catch(e){ a2 = null; }
+    if(a2) doAct(a2, true);
+  }, delay);
 }
 function jogar(type, extra){ var m = S.lastMesa, me = mySeat(m), a = { type:type, player:me }; for(var k in (extra||{})) a[k] = extra[k]; return doAct(a); }
 function checkTimeouts(){
@@ -1046,6 +1085,8 @@ document.addEventListener("click", function(ev){
     case "mesa-back": closeMesa(); break;
     case "sit": sitAt(parseInt(id,10)); break;
     case "stand": standUp(); break;
+    case "add-bot": setBot(parseInt(id,10), true); break;
+    case "rm-bot": setBot(parseInt(id,10), false); break;
     case "start-match": startMatch(); break;
     case "del-mesa": deleteMesa(); break;
     case "g-sel": var cid = parseInt(id,10), ix = S.sel.indexOf(cid); if(ix>=0) S.sel.splice(ix,1); else S.sel.push(cid); S._forceRender = true; render(); break;

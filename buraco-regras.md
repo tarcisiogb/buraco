@@ -270,3 +270,9 @@ Não há pontos em aberto. Ao fechar o documento, assumi duas coisas que você n
 - **Encerrar a partida antes da meta:** qualquer jogador **propõe**; os **4 precisam aceitar**. Um "recusar" cancela a proposta. O administrador da mesa (criador ou Master) pode encerrar na hora.
 - **Efeito do encerramento:** a partida é **cancelada** — todos os pontos são cancelados e **não há vencedor**.
 - **Adicionar várias cartas:** é possível selecionar várias cartas e tocar num jogo da dupla. Elas entram **uma por vez**, na ordem em que encaixarem; se alguma não encaixar, nenhuma é aplicada.
+
+## 14. BOTS
+
+- Ao montar a mesa, quem criou (ou o Master) pode ocupar de **1 a 3 lugares com bots**, na dupla que quiser (parceiro ou adversário). O bot pode ser retirado enquanto a partida não começou.
+- Os bots seguem **exatamente as mesmas regras** e só enxergam o que um jogador enxergaria (a própria mão, os jogos da mesa e o lixo).
+- Os bots jogam pelo celular de um jogador humano sentado na mesa; se ele sair, outro humano assume. Numa partida pausada, os bots esperam. Nos pedidos de encerramento antecipado, os bots **aceitam**.
