@@ -312,7 +312,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07l";
+var BUILD = "2026-11-07m";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -909,29 +909,54 @@ function criarMesa(){
   mesasCol().add({ nome:nome, criadoPor:S.user.uid, status:"aguardando", seats:[S.user.uid,null,null,null], criadoEm:firebase.firestore.FieldValue.serverTimestamp() })
     .then(function(ref){ S.mesaId = ref.id; S.pendingMesa = ref.id; S.pendingAt = Date.now(); S._forceRender = true; render(); }).catch(toastErr);
 }
-function sitAt(idx){
-  var ref = mesasCol().doc(S.mesaId), uid = S.user.uid;
-  db.runTransaction(function(tx){ return tx.get(ref).then(function(d){
+function optSeats(fn){ var m = mesaAtual(); if(!m || !m.seats) return; var c = m.seats.slice(); fn(c); m.seats = c; S._forceRender = true; render(); }
+function refreshMesa(){
+  mesasCol().doc(S.mesaId).get({ source:"server" }).then(function(d){
+    if(!d.exists || !S.mesas) return; var o = d.data(); o.id = d.id;
+    for(var i=0;i<S.mesas.length;i++) if(S.mesas[i].id === d.id) S.mesas[i] = o;
+    S._forceRender = true; render();
+  }).catch(function(){});
+}
+function seatOp(key, optimistic, tx){
+  S.seatBusy = S.seatBusy || {};
+  if(S.seatBusy[key]) return;                // toque repetido enquanto envia: ignora
+  S.seatBusy[key] = true;
+  optSeats(optimistic);                      // a tela responde na hora
+  var ref = mesasCol().doc(S.mesaId);
+  db.runTransaction(function(t){ return t.get(ref).then(function(d){
     if(!d.exists) throw {message:"Essa mesa não existe mais."};
     var m = d.data(); if(m.status !== "aguardando") throw {message:"A partida já começou."};
-    var seats = m.seats.slice(); if(seats[idx] && seats[idx] !== uid) throw {message:"Esse lugar já foi ocupado."};
+    var seats = m.seats.slice(); var r = tx(seats); if(r === false) return; t.update(ref, { seats:seats });
+  }); }).catch(function(e){ toastErr(e); refreshMesa(); }).then(function(){ S.seatBusy[key] = false; });
+}
+function sitAt(idx){
+  var uid = S.user.uid;
+  seatOp("seat" + idx, function(c){ for(var i=0;i<4;i++) if(c[i] === uid) c[i] = null; c[idx] = uid; }, function(seats){
+    if(seats[idx] === uid) return false;
+    if(seats[idx]) throw {message:"Esse lugar já foi ocupado."};
     for(var i=0;i<4;i++) if(seats[i] === uid) seats[i] = null;
-    seats[idx] = uid; tx.update(ref, {seats:seats});
-  }); }).catch(toastErr);
+    seats[idx] = uid;
+  });
 }
 function setBot(idx, on){
-  var ref = mesasCol().doc(S.mesaId);
-  db.runTransaction(function(tx){ return tx.get(ref).then(function(d){
-    if(!d.exists) return; var m = d.data(); if(m.status !== "aguardando") throw {message:"A partida já começou."};
-    var seats = m.seats.slice();
-    if(on){ if(seats[idx]) throw {message:"Esse lugar já foi ocupado."}; var livres = [0,1,2,3].filter(function(n){ return seats.indexOf("bot:" + n) < 0; }); seats[idx] = "bot:" + livres[Math.floor(Math.random() * livres.length)]; }
-    else if(isBot(seats[idx])) seats[idx] = null;
-    tx.update(ref, {seats:seats});
-  }); }).catch(toastErr);
+  var m0 = mesaAtual(), cur = m0 ? m0.seats : [null,null,null,null];
+  var livres = [0,1,2,3].filter(function(n){ return cur.indexOf("bot:" + n) < 0; }), pick = "bot:" + (livres.length ? livres[Math.floor(Math.random() * livres.length)] : idx);
+  seatOp("bot" + idx, function(c){ if(on){ if(!c[idx]) c[idx] = pick; } else if(isBot(c[idx])) c[idx] = null; }, function(seats){
+    if(on){
+      if(isBot(seats[idx])) return false;                       // já colocado
+      if(seats[idx]) throw {message:"Esse lugar já foi ocupado."};
+      var used = seats.filter(isBot), want = used.indexOf(pick) < 0 ? pick : null;
+      if(!want){ var l2 = [0,1,2,3].filter(function(n){ return used.indexOf("bot:" + n) < 0; }); want = "bot:" + (l2.length ? l2[Math.floor(Math.random() * l2.length)] : idx); }
+      seats[idx] = want;
+    } else if(isBot(seats[idx])) seats[idx] = null; else return false;
+  });
 }
 function standUp(){
-  var ref = mesasCol().doc(S.mesaId), uid = S.user.uid;
-  db.runTransaction(function(tx){ return tx.get(ref).then(function(d){ if(!d.exists) return; var m = d.data(); if(m.status !== "aguardando") return; var seats = m.seats.map(function(x){ return x === uid ? null : x; }); tx.update(ref, {seats:seats}); }); }).catch(toastErr);
+  var uid = S.user.uid;
+  seatOp("stand", function(c){ for(var i=0;i<4;i++) if(c[i] === uid) c[i] = null; }, function(seats){
+    var had = false; for(var i=0;i<4;i++) if(seats[i] === uid){ seats[i] = null; had = true; }
+    if(!had) return false;
+  });
 }
 function startMatch(){
   var ref = mesasCol().doc(S.mesaId);
