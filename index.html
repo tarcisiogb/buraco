@@ -315,7 +315,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07s";
+var BUILD = "2026-11-07t";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -719,9 +719,18 @@ function regrasHtml(){
 }
 function tabBtn(id, label, dot){ return '<button class="tab'+(S.tab===id?" on":"")+'" role="tab" data-action="tab" data-id="'+id+'">'+label+(dot?'<span class="dot"></span>':"")+'</button>'; }
 
+var GAMES = [
+  { id:"buraco", ic:"🃏", nome:"Buraco", desc:"Buraco Aberto · 4 jogadores, 2 duplas", ok:true },
+  { id:"faroeste", ic:"🤠", nome:"Faroeste", desc:"Duelo de xerife, foras da lei e renegado · 4 a 7 jogadores", ok:false }
+];
+function gamesPanel(){
+  return '<div class="panel"><div class="eyebrow">Jogos</div><h2 class="ph">Central de jogos da família</h2>'+GAMES.map(function(g){
+    return '<div class="row"><div class="av sm" style="font-size:1.3em">'+g.ic+'</div><div class="grow"><div class="t">'+esc(g.nome)+'</div><div class="s">'+esc(g.desc)+'</div></div>'+(g.ok?'<span class="badge m">Disponível</span>':'<span class="badge">Em breve</span>')+'</div>';
+  }).join("")+'</div>';
+}
 function viewInicio(){
   var ap = S.players.filter(function(p){ return p.status === "aprovado"; }).sort(porApelido);
-  var h = [mesasPanel()];
+  var h = [mesasPanel(), gamesPanel()];
   h.push('<div class="panel"><div class="eyebrow">Família</div><h2 class="ph">Quem está por aqui</h2>');
   if(!ap.length) h.push('<p class="muted" style="margin-top:8px">Carregando…</p>');
   ap.forEach(function(p){
@@ -924,7 +933,7 @@ function cleanSel(){ var m = S.lastMesa, g = S.game; if(!g || !m) return; var me
 /* ── lobby ── */
 function criarMesa(){
   var nome = val("mesa_nome").trim() || ("Mesa de " + (S.me.apelido || primeiro(S.me.nome)));
-  mesasCol().add({ nome:nome, criadoPor:S.user.uid, status:"aguardando", seats:[S.user.uid,null,null,null], criadoEm:firebase.firestore.FieldValue.serverTimestamp() })
+  mesasCol().add({ nome:nome, criadoPor:S.user.uid, status:"aguardando", jogo:"buraco", seats:[S.user.uid,null,null,null], criadoEm:firebase.firestore.FieldValue.serverTimestamp() })
     .then(function(ref){ S.mesaId = ref.id; S.pendingMesa = ref.id; S.pendingAt = Date.now(); S._forceRender = true; render(); }).catch(toastErr);
 }
 function optSeats(fn){ var m = mesaAtual(); if(!m || !m.seats) return; var c = m.seats.slice(); fn(c); m.seats = c; S._forceRender = true; render(); }
