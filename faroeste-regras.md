@@ -1,7 +1,7 @@
 # Faroeste — Regras Modeladas (4 a 7 jogadores)
 
 > Rascunho para aprovação. Mecânica inspirada no jogo de cartas de duelo que a família tem em casa; **nomes, cartas, personagens e arte são originais** (ver seção 10).
-> Falta só a lista de quantidades de cada carta (seção 9), que você vai enviar.
+> Quantidades de cartas recebidas (seção 9). Falta só a distribuição de naipes/valores, opcional.
 
 ---
 
@@ -97,9 +97,28 @@ Cartas **marrons** (efeito imediato): vão ao descarte. Cartas **azuis** (equipa
 Se há Dinamite e Cadeia em jogo, resolve a Dinamite antes. Dano de Dinamite não é causado por jogador.
 A mesma carta com símbolo de Errou/Tiro pode ser usada no lugar da outra por personagens específicos (ver 10).
 
-## 9. Quantidades no baralho
+## 9. Quantidades no baralho (80 cartas)
 
-**Aguardando sua lista** (baralho de referência do jogo físico: 80 cartas). Cada carta também tem valor e naipe para o "saque" (♠♥♦♣ e 2 a A). Vou usar suas quantidades e a distribuição de naipes/valores por carta.
+Fonte: lista que você enviou (resumo de buscador). A soma fecha em 80 (o texto dizia 56 marrons + 24 azuis, mas a lista detalhada dá 61 + 19; uso a lista).
+
+| Carta | Qtd | | Carta | Qtd |
+|-------|-----|-|-------|-----|
+| Tiro | 25 | | Cavalo Veloz | 2 |
+| Errou | 12 | | Luneta | 2 (*) |
+| Tônico | 6 | | Barril de Blindagem | 2 |
+| Confisco | 4 | | Cadeia | 3 |
+| Assalto | 4 | | Dinamite | 2 |
+| Estouro da Boiada | 2 | | Repetidor | 2 |
+| Armazém | 2 | | Cano Curto | 3 |
+| Diligência | 2 | | Pistola Longa | 1 |
+| Carroça do Correio | 1 | | Carabina | 1 |
+| Rajada | 1 | | Rifle | 1 |
+| Duelo | 1 | | | |
+| Taberna | 1 | | **Total** | **80** |
+
+(*) A lista tinha "Scope 1" e "Appaloosa 1", que têm o mesmo efeito: viram 2 Lunetas.
+
+**Naipes e valores (para o "saque"):** a lista não traz. Vou distribuir as 80 cartas de forma equilibrada (20 de cada naipe, valores de 2 a A espalhados), com ♥ em 25% das cartas, como no jogo físico. Se você quiser a distribuição exata, me envie as fotos das cartas; sem ela, a diferença é só de sorte no saque.
 
 ## 10. Personagens originais (16)
 
