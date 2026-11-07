@@ -822,13 +822,22 @@ test('histórico guarda canastras, bater sem coringa, maior lixo levado e vulner
   assert.strictEqual(h.by, 0); assert.strictEqual(h.sem, true); assert.strictEqual(h.lixo, 11);
   assert.strictEqual(h.cnt.A.limpa, 1); assert.strictEqual(h.vul.A, false);
 });
-test('mensagem da última carta explica o motivo (sem morto na mesa)', () => {
+test('sem morto na mesa e sem ter pego: dupla com canastra limpa PODE bater (−100 do morto, +100 da batida)', () => {
   const s = fresh({ config: { drawSeconds: 0, playSeconds: 0 } });
   s.mortos = []; s.teams.B.mortoTaken = true; addMeld(s, 'A', '4S 5S 6S 7S 8S 9S 10S');
   s.players[0].hand = K('3C'); s.phase = 'PLAYING'; s.turn = { player: 0, deadline: null, drewFrom: 'STOCK' };
+  const r = must(play(s, { type: 'DISCARD', player: 0, cardId: s.players[0].hand[0].id }));
+  assert.strictEqual(r.roundResult.reason, 'BATIDA');
+  const d = r.roundResult.detail.A;
+  assert.strictEqual(d.morto, -100); assert.strictEqual(d.batida, 100);
+});
+test('sem canastra limpa não bate, e a mensagem explica', () => {
+  const s = fresh({ config: { drawSeconds: 0, playSeconds: 0 } });
+  s.mortos = []; s.teams.B.mortoTaken = true;
+  s.players[0].hand = K('3C'); s.phase = 'PLAYING'; s.turn = { player: 0, deadline: null, drewFrom: 'STOCK' };
   const r = play(s, { type: 'DISCARD', player: 0, cardId: s.players[0].hand[0].id });
   assert.strictEqual(r.ok, false); assert.strictEqual(r.error.code, 'LAST_CARD_RULE');
-  assert(/não pegou o morto/.test(r.error.message));
+  assert(/canastra limpa/.test(r.error.message));
 });
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);

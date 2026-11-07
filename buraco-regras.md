@@ -134,7 +134,7 @@ Canastra é um **jogo com 7 ou mais cartas**.
 ### 6.3 Monte acabou
 1. Se houver morto ainda não pego, suas 11 cartas viram o **novo monte**
 2. Se os **dois mortos** estiverem disponíveis, **um é sorteado** aleatoriamente
-3. Como o morto não tem dono, ninguém perde nada na hora: **quem terminar a rodada sem ter pego um morto leva -100** (seção 8.2) e, sem morto, não consegue bater (seção 7.1). A dupla que ainda não pegou pode pegar o morto que restou, se esvaziar a mão antes
+3. Como o morto não tem dono, ninguém perde nada na hora: **quem terminar a rodada sem ter pego um morto leva -100** (seção 8.2) mas isso **não impede de bater**: sem morto na mesa, a dupla com canastra limpa pode bater e fica com -100 do morto e +100 da batida (seção 7.1). A dupla que ainda não pegou pode pegar o morto que restou, se esvaziar a mão antes
 4. Se o novo monte acabar e ainda restar o outro morto, ele vira monte também. Nesse cenário, **nenhuma dupla pegou morto, então as duas perdem 100**
 5. Se o monte acabar e **não houver mais morto** para virar monte, a **rodada termina** (a partida segue até 3.000, seção 8.4). O placar é calculado como na seção 8: canastras, cartas nos jogos, cartas na mão como negativo e -100 para quem não pegou o morto.
 
@@ -143,7 +143,7 @@ Canastra é um **jogo com 7 ou mais cartas**.
 ## 7. BATIDA (fim da rodada)
 
 ### 7.1 Condições para bater
-1. A dupla já **pegou o morto**
+1. A dupla já **pegou o morto** — **ou já não existe morto na mesa** (os dois foram pegos ou viraram monte). Nesse caso a dupla pode bater mesmo sem ter pego o morto, mas leva os **-100 do morto** (seção 8.2) além do +100 da batida
 2. A dupla tem **pelo menos 1 canastra limpa** na mesa
 3. O jogador fica sem cartas na mão
 

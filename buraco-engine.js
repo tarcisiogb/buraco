@@ -377,7 +377,8 @@
     const t = teamOf(playerIdx);
     const team = state.teams[t];
     if (!team.mortoTaken && state.mortos.length > 0) return 'MORTO'; // o morto não tem dono: vale quem esvaziar a mão primeiro
-    if (team.mortoTaken && hasCleanCanastra(team)) return 'BATIDA';
+    // bate quem tem canastra limpa e já pegou o morto — ou não há mais morto (aí a dupla leva -100 do morto e +100 da batida)
+    if (hasCleanCanastra(team)) return 'BATIDA';
     return null; // regra da última carta (3.4)
   }
 
@@ -447,8 +448,7 @@
   function lastCardMsg(state, p) {
     const team = state.teams[p.team];
     let why = '';
-    if (!team.mortoTaken && state.mortos.length === 0) why = 'Sua dupla não pegou o morto e já não há morto: não dá para bater nesta rodada. ';
-    else if (team.mortoTaken && !hasCleanCanastra(team)) why = 'Sua dupla ainda não tem canastra limpa, então não pode bater. ';
+    if (!hasCleanCanastra(team)) why = 'Sua dupla ainda não tem canastra limpa, então não pode bater. ';
     return why + 'Você precisa ficar com ao menos 1 carta na mão.';
   }
 
