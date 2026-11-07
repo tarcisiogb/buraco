@@ -312,7 +312,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07j";
+var BUILD = "2026-11-07k";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -1034,7 +1034,16 @@ function lobbyHtml(m){
 /* ───────── Jogo: ações, sincronização, som, animação ───────── */
 var AC = null, MUTED = false;
 try{ MUTED = localStorage.getItem("buraco_mute") === "1"; }catch(e){}
-var MASTER = null, SILENT = null;
+var MASTER = null, SILENT = null, AUDIO_DIRTY = false, AUDIO_STALL = 0, AUDIO_LAST_T = -1;
+/* vigia: no iPhone o áudio pode "congelar" (estado ok, mas sem avançar) depois de notificação/bloqueio de tela */
+setInterval(function(){
+  if(!AC || MUTED) return;
+  var t = AC.currentTime;
+  if(AC.state !== "running" || t === AUDIO_LAST_T) AUDIO_STALL++; else AUDIO_STALL = 0;
+  AUDIO_LAST_T = t;
+  if(AUDIO_STALL >= 2){ AUDIO_DIRTY = true; try{ AC.resume(); }catch(e){} }
+  if(AUDIO_STALL >= 4){ newCtx(); AUDIO_STALL = 0; }
+}, 1500);
 function newCtx(){
   try{ if(AC){ try{ AC.close(); }catch(e){} } }catch(e){}
   try{ AC = new (window.AudioContext || window.webkitAudioContext)(); var comp = AC.createDynamicsCompressor(); MASTER = AC.createGain(); MASTER.gain.value = 2.2; MASTER.connect(comp); comp.connect(AC.destination); }catch(e){ AC = null; MASTER = null; }
@@ -1047,14 +1056,15 @@ function audioCtx(){
 }
 function unlockAudio(force){
   try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){}   // iPhone: toca mesmo com o botão de silenciar
-  if(force === true || !AC || AC.state === "closed" || AC.state === "interrupted") newCtx();
+  if(force === true || AUDIO_DIRTY || !AC || AC.state !== "running"){ newCtx(); AUDIO_DIRTY = false; AUDIO_STALL = 0; }
   var c = audioCtx(); if(!c) return;
   try{ var b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); }catch(e){}
   setTimeout(function(){ if(AC && AC.state !== "running" && force !== "retry"){ newCtx(); try{ var c2 = AC, b2 = c2.createBuffer(1, 1, 22050), s2 = c2.createBufferSource(); s2.buffer = b2; s2.connect(c2.destination); s2.start(0); c2.resume(); }catch(e){} } }, 250);
   try{ if(!SILENT) SILENT = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="); SILENT.currentTime = 0; SILENT.play().catch(function(){}); }catch(e){}
 }
 ["pointerdown","touchstart","touchend","click"].forEach(function(ev){ document.addEventListener(ev, function(){ unlockAudio(); }, { passive:true }); });
-document.addEventListener("visibilitychange", function(){ if(!document.hidden && AC && AC.state !== "running"){ try{ AC.resume(); }catch(e){} } });
+document.addEventListener("visibilitychange", function(){ if(!document.hidden){ AUDIO_DIRTY = true; if(AC){ try{ AC.resume(); }catch(e){} } } });
+window.addEventListener("pageshow", function(){ AUDIO_DIRTY = true; });
 function snap(t0, freq, dur, vol){
   var c = AC; if(!c) return; var n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
   for(var i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, 3);
@@ -1068,7 +1078,7 @@ function tone(t0, freq, dur, vol, type){
   o.connect(g); g.connect(MASTER); o.start(t0); o.stop(t0 + dur + 0.02);
 }
 function sfx(kind){
-  if(MUTED) return; var c = audioCtx(); if(!c) return;
+  if(MUTED) return; if(AUDIO_DIRTY && AC && AC.state !== "running"){ newCtx(); AUDIO_DIRTY = false; } var c = audioCtx(); if(!c) return;
   if(c.state !== "running"){ try{ c.resume().then(function(){ if(AC && AC.state === "running") sfxPlay(kind); }).catch(function(){}); }catch(e){} return; }
   sfxPlay(kind);
 }
