@@ -168,7 +168,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .pc b{font-size:calc(var(--cw,44px)*.42)}.pc i{font-style:normal;font-size:calc(var(--cw,44px)*.44)}
 .pc.r{color:#b23a2e}
 .pc.back{background:repeating-linear-gradient(45deg,#a33a3a,#a33a3a 4px,#8d2f2f 4px,#8d2f2f 8px);border:2px solid #fbf8ef}
-.pc.wild:after{content:"";position:absolute;left:12%;right:12%;bottom:5%;height:calc(var(--cw)*.1);border-radius:2px;background:var(--gold)}
+.pc.wild:after{content:"";position:absolute;left:12%;right:12%;bottom:3%;height:calc(var(--cw)*.1);border-radius:2px;background:var(--gold)}
 .pc.sel{transform:translateY(-10px);border:2px solid var(--gold);box-shadow:0 6px 12px rgba(0,0,0,.3);z-index:2}
 .pc.new{animation:newGlow 2.4s ease-out}
 @keyframes newGlow{0%{z-index:5;transform:translateY(-16px) scale(1.18);box-shadow:0 0 0 3px var(--gold),0 0 20px var(--gold)}40%{transform:translateY(-8px) scale(1.08);box-shadow:0 0 0 3px var(--gold),0 0 14px var(--gold)}100%{transform:none;box-shadow:0 0 0 0 transparent;z-index:auto}}
@@ -229,6 +229,24 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .dots:after{content:"";animation:dots 1.2s steps(4) infinite}
 @keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
 .statusrow{min-height:34px}
+
+.hrow{height:calc(var(--cw)*1.04 + 12px)}
+.hrow+.hrow{height:calc(var(--cw)*1.04 + 2px)}
+.hrow .pc{height:calc(var(--cw)*1.04);overflow:hidden;border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:0}
+.stackcards .pc{height:calc(var(--cw)*1.02);overflow:hidden;border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:0}
+.pc.t10 b{font-size:calc(var(--cw,44px)*.34);letter-spacing:-.06em}
+.pc.wild:after{bottom:0}
+.mhalf.dense .stackcards .pc+.pc{margin-left:calc(var(--cw)*-.62)}
+.stackcards.dn .pc+.pc{margin-left:calc(var(--cw)*-.6)}
+.chip{padding:3px 5px;border-radius:10px;gap:5px}
+.chip .av{width:24px;height:24px;font-size:9px}
+.chip .nm{font-size:11px}.chip .ct{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mortos{text-align:right;font-size:10px;line-height:1.3;margin-left:auto}
+.lastact{min-height:18px;font-size:11px}
+.statusrow{min-height:32px}
+.mtitle{display:flex;align-items:center;gap:6px}
+.mtitle .zoom{margin-left:auto;background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:2px 9px;cursor:pointer}
+.zoombox{max-height:62vh;overflow:auto;margin-top:8px;--ms:1.9}
 </style>
 </head>
 <body>
@@ -242,7 +260,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07b";
+var BUILD = "2026-11-07c";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -635,7 +653,7 @@ function listenMesas(){
 }
 function stopMesas(){ if(unsubMesas){ unsubMesas(); unsubMesas = null; } S.mesas = null; stopGame(); S.mesaId = null; }
 
-function stopGame(){ if(unsubGame){ unsubGame(); unsubGame = null; } gameFor = null; S.game = null; S.gameV = 0; S.sel = []; S.picker = null; S.lastN = null; S.anims = []; S.sending = false; S.menu = false; }
+function stopGame(){ if(unsubGame){ unsubGame(); unsubGame = null; } gameFor = null; S.game = null; S.gameV = 0; S.sel = []; S.picker = null; S.lastN = null; S.anims = []; S.sending = false; S.menu = false; S.zoom = null; }
 function ensureGameListener(){
   var m = mesaAtual();
   if(S.mesaId && m && m.status !== "aguardando" && mySeat(m) >= 0 && gameFor !== S.mesaId) startGameListener(S.mesaId);
@@ -774,18 +792,26 @@ function lobbyHtml(m){
 var AC = null, MUTED = false;
 try{ MUTED = localStorage.getItem("buraco_mute") === "1"; }catch(e){}
 var MASTER = null, SILENT = null;
+function newCtx(){
+  try{ if(AC){ try{ AC.close(); }catch(e){} } }catch(e){}
+  try{ AC = new (window.AudioContext || window.webkitAudioContext)(); var comp = AC.createDynamicsCompressor(); MASTER = AC.createGain(); MASTER.gain.value = 2.2; MASTER.connect(comp); comp.connect(AC.destination); }catch(e){ AC = null; MASTER = null; }
+  return AC;
+}
 function audioCtx(){
-  if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); var comp = AC.createDynamicsCompressor(); MASTER = AC.createGain(); MASTER.gain.value = 2.2; MASTER.connect(comp); comp.connect(AC.destination); }catch(e){ AC = null; } }
+  if(!AC) newCtx();
   if(AC && AC.state !== "running"){ try{ AC.resume(); }catch(e){} }
   return AC;
 }
-function unlockAudio(){
+function unlockAudio(force){
   try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){}   // iPhone: toca mesmo com o botão de silenciar
+  if(force === true || !AC || AC.state === "closed" || AC.state === "interrupted") newCtx();
   var c = audioCtx(); if(!c) return;
   try{ var b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); }catch(e){}
-  if(!SILENT){ try{ SILENT = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="); SILENT.play().catch(function(){}); }catch(e){} }
+  setTimeout(function(){ if(AC && AC.state !== "running" && force !== "retry"){ newCtx(); try{ var c2 = AC, b2 = c2.createBuffer(1, 1, 22050), s2 = c2.createBufferSource(); s2.buffer = b2; s2.connect(c2.destination); s2.start(0); c2.resume(); }catch(e){} } }, 250);
+  try{ if(!SILENT) SILENT = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="); SILENT.currentTime = 0; SILENT.play().catch(function(){}); }catch(e){}
 }
-["pointerdown","touchstart","touchend","click"].forEach(function(ev){ document.addEventListener(ev, unlockAudio, { passive:true }); });
+["pointerdown","touchstart","touchend","click"].forEach(function(ev){ document.addEventListener(ev, function(){ unlockAudio(); }, { passive:true }); });
+document.addEventListener("visibilitychange", function(){ if(!document.hidden && AC && AC.state !== "running"){ try{ AC.resume(); }catch(e){} } });
 function snap(t0, freq, dur, vol){
   var c = AC; if(!c) return; var n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
   for(var i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, 3);
@@ -800,7 +826,7 @@ function tone(t0, freq, dur, vol, type){
 }
 function sfx(kind){
   if(MUTED) return; var c = audioCtx(); if(!c) return;
-  if(c.state !== "running"){ try{ c.resume().then(function(){ sfxPlay(kind); }).catch(function(){}); }catch(e){} return; }
+  if(c.state !== "running"){ try{ c.resume().then(function(){ if(AC && AC.state === "running") sfxPlay(kind); }).catch(function(){}); }catch(e){} return; }
   sfxPlay(kind);
 }
 function sfxPlay(kind){
@@ -992,7 +1018,7 @@ function tapStock(){ var g = S.game, me = mySeat(S.lastMesa); if(!(g.turn.player
 function tapDiscard(){ var g = S.game, me = mySeat(S.lastMesa); if(!(g.turn.player === me && g.phase === "WAITING_TURN" && !g.paused)){ toast(g.turn.player === me ? "Você já comprou. Agora jogue ou descarte." : "Aguarde a sua vez."); return; } if(!g.discard.length){ toast("O lixo está vazio."); return; } jogar("DRAW_DISCARD"); }
 
 /* ── telas do jogo ── */
-function cardHtml(c, cls, attrs){ return '<div class="pc '+((c.suit==="H"||c.suit==="D")?"r ":"")+(cls||"")+'" '+(attrs||"")+'><b>'+c.rank+'</b><i>'+SYM[c.suit]+'</i></div>'; }
+function cardHtml(c, cls, attrs){ return '<div class="pc '+((c.suit==="H"||c.suit==="D")?"r ":"")+(c.rank==="10"?"t10 ":"")+(cls||"")+'" '+(attrs||"")+'><b>'+c.rank+'</b><i>'+SYM[c.suit]+'</i></div>'; }
 function posLabel(p){ return p === 1 || p === 14 ? "A" : (p === 11 ? "J" : p === 12 ? "Q" : p === 13 ? "K" : String(p)); }
 function entriesHtml(entries){ return '<div class="stackcards">'+entries.map(function(e){ return cardHtml({ rank:e.card.rank, suit:e.card.suit }, e.wild ? "wild" : ""); }).join("")+'</div>'; }
 function meldInfoText(meld){
@@ -1014,7 +1040,7 @@ function meldHtml(meld, tap){
 }
 function halfHtml(g, t, mine, tap){
   var ms = g.teams[t].melds;
-  return '<div class="mhalf '+(t==="A"?"ta":"tb")+(mine?" us":" them")+'"><div class="mtitle">'+(mine?"Nossos jogos":"Jogos deles")+' · '+ms.length+'</div><div class="meldwrap">'+ms.map(function(ml){ return meldHtml(ml, mine && tap); }).join("")+(ms.length?"":'<div class="mi" style="opacity:.6;font-size:11px">nenhum</div>')+'</div></div>';
+  return '<div class="mhalf '+(t==="A"?"ta":"tb")+(mine?" us":" them")+'"><div class="mtitle"><span>'+(mine?"Nossos jogos":"Jogos deles")+' · '+ms.length+'</span>'+(ms.length?'<button class="zoom" data-action="zoom-melds" data-id="'+(mine?"us":"them")+'">⤢ ampliar</button>':"")+'</div><div class="meldwrap">'+ms.map(function(ml){ return meldHtml(ml, mine && tap); }).join("")+(ms.length?"":'<div class="mi" style="opacity:.6;font-size:11px">nenhum</div>')+'</div></div>';
 }
 function sortedHand(hand){
   var so = {S:0,H:1,C:2,D:3}, v = function(c){ return c.rank==="A"?1:c.rank==="J"?11:c.rank==="Q"?12:c.rank==="K"?13:parseInt(c.rank,10); };
@@ -1073,9 +1099,9 @@ function gameHtml(m, me){
   var dis = g.discard, landing = (S.landId && now < S.landUntil) ? S.landId : null;
   var drows = rowsOf(dis, 16).map(function(r, ri, all){ return '<div class="fanrow">'+r.map(function(c, ci){ var last = ri===all.length-1 && ci===r.length-1; return cardHtml(c, last && landing===c.id ? "land" : ""); }).join("")+'</div>'; }).join("");
   h.push('<div class="felt"><div class="center">'+
-    '<div class="pile'+(canPick?" tapok":"")+'" data-action="g-stock"><div id="pile-stock" class="pc back" style="--cw:40px"></div><div>Monte<br><b>'+g.stock.length+'</b></div></div>'+
+    '<div class="pile'+(canPick?" tapok":"")+'" data-action="g-stock"><div id="pile-stock" class="pc back" style="--cw:32px"></div><div>Monte<br><b>'+g.stock.length+'</b></div></div>'+
     '<div class="discardbox'+(canPick&&dis.length?" tapok":"")+'" id="pile-discard" '+(dis.length?'data-action="g-discard"':'')+' style="--cw:28px">'+(dis.length?drows:'<div class="cap" style="padding:8px 2px;opacity:.7">Lixo vazio</div>')+'<div class="cap">Lixo · '+dis.length+(canPick&&dis.length?' · toque para pegar':"")+'</div></div>'+
-    '<div class="mortos"><div class="stk" style="--cw:22px">'+g.mortos.map(function(){ return '<div class="pc back"></div>'; }).join("")+'</div>Mortos<br><b>'+g.mortos.length+'</b><br><span style="opacity:.85">'+(g.teams[team].mortoTaken?"nós ✓":"nós —")+'<br>'+(g.teams[opp].mortoTaken?"eles ✓":"eles —")+'</span></div></div>');
+    '<div class="mortos">Mortos <b>'+g.mortos.length+'</b><br>nós '+(g.teams[team].mortoTaken?"✓":"—")+'<br>eles '+(g.teams[opp].mortoTaken?"✓":"—")+'</div></div>');
   var lastE = null, lg = (g.log||[]); for(var q=lg.length-1;q>=0;q--){ if(logTxt(g, lg[q])){ lastE = lg[q]; break; } }
   h.push('<div class="lastact">'+(lastE?esc(logTxt(g,lastE))+(lastE.type==="DISCARDED"?' <span style="--cw:22px">'+cardHtml(lastE.card,"")+'</span>':""):"&nbsp;")+'</div>');
   var tap = myTurn && g.phase==="PLAYING" && S.sel.length>=1;
@@ -1093,6 +1119,7 @@ function gameHtml(m, me){
   h.push('</div>');
   var out = h.join("");
   if(S.banner && now < S.banner.until) out += '<div class="banner '+S.banner.cls+'">'+esc(S.banner.txt)+'<small>'+esc(S.banner.sub)+'</small></div>';
+  if(S.zoom){ var zt = S.zoom === "us" ? team : opp; out += '<div class="modalbg" data-action="close-zoom"><div class="modal wide" data-stop="1"><h3>'+(S.zoom==="us"?"Nossos jogos":"Jogos deles")+'</h3><div class="zoombox"><div class="meldwrap">'+g.teams[zt].melds.map(function(ml){ return meldHtml(ml, false); }).join("")+'</div></div><button class="btn ghost" data-action="close-zoom">Fechar</button></div></div>'; }
   if(S.picker) out += pickerHtml();
   if(g.paused && g.phase !== "GAME_OVER") out += '<div class="modalbg"><div class="modal"><div style="font-size:42px">⏸</div><h3>Jogo pausado</h3><p class="muted" style="margin-top:6px">'+esc(g.players[g.paused.by].name)+' pausou a partida.</p><button class="btn" data-action="g-resume">Continuar</button><button class="btn ghost" data-action="mesa-back">Sair e voltar depois</button><p class="muted" style="margin-top:8px;font-size:12px">A partida fica salva: dá para retomar em outro momento.</p></div></div>';
   if(S.menu) out += '<div class="modalbg" data-action="close-menu"><div class="modal wide" data-stop="1"><h3>Mais opções</h3><button class="btn ghost" data-action="g-propose-end"'+(g.endVote?" disabled":"")+'>Propor encerrar a partida</button>'+(canForceEnd(m)?'<button class="btn danger" data-action="g-end-now">Encerrar agora (administrador)</button>':"")+'<button class="btn ghost" data-action="close-menu">Fechar</button></div></div>';
@@ -1144,11 +1171,15 @@ function layoutFans(){
   }
 }
 function fitMelds(){
-  var app = $("app"), area = $("meldarea"); if(!area) return;
+  var area = $("meldarea"); if(!area) return;
   var halves = area.querySelectorAll(".mhalf");
+  function over(hf){ return hf.scrollHeight > hf.clientHeight + 1; }
   for(var i=0;i<halves.length;i++){
-    var hf = halves[i], ms = 1; hf.style.setProperty("--ms", ms);
-    var guard = 0; while(hf.scrollHeight > hf.clientHeight + 1 && ms > 0.4 && guard++ < 12){ ms = Math.round((ms - 0.06) * 100) / 100; hf.style.setProperty("--ms", ms); }
+    var hf = halves[i], ms = 1.25; hf.classList.remove("dense"); hf.style.setProperty("--ms", ms);
+    var guard = 0;
+    while(over(hf) && ms > 0.62 && guard++ < 14){ ms = Math.round((ms - 0.06) * 100) / 100; hf.style.setProperty("--ms", ms); }
+    if(over(hf)){ hf.classList.add("dense"); ms = Math.max(ms, 0.9); hf.style.setProperty("--ms", ms); guard = 0;
+      while(over(hf) && ms > 0.42 && guard++ < 14){ ms = Math.round((ms - 0.05) * 100) / 100; hf.style.setProperty("--ms", ms); } }
   }
 }
 setInterval(function(){
@@ -1160,7 +1191,7 @@ window.addEventListener("resize", function(){ if(S._inGame){ layoutFans(); fitMe
 
 document.addEventListener("click", function(ev){
   var el = ev.target.closest("[data-action]"); if(!el) return;
-  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
+  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu" || da0 === "close-zoom") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
   var act = el.getAttribute("data-action"), id = el.getAttribute("data-id");
   switch(act){
     case "reload": location.reload(); break;
@@ -1177,9 +1208,11 @@ document.addEventListener("click", function(ev){
     case "g-sort": S.sortMode = S.sortMode==="suit" ? "rank" : "suit"; S._forceRender = true; render(); break;
     case "g-stock": tapStock(); break;
     case "g-discard": tapDiscard(); break;
-    case "g-mute": MUTED = !MUTED; try{ localStorage.setItem("buraco_mute", MUTED ? "1" : "0"); }catch(e){} if(!MUTED) sfx("draw"); S._forceRender = true; render(); break;
+    case "g-mute": MUTED = !MUTED; try{ localStorage.setItem("buraco_mute", MUTED ? "1" : "0"); }catch(e){} if(!MUTED){ unlockAudio(true); setTimeout(function(){ sfx("turn"); }, 120); } S._forceRender = true; render(); break;
     case "g-pause": jogar("PAUSE"); break;
     case "g-resume": jogar("RESUME"); break;
+    case "zoom-melds": S.zoom = id; S._forceRender = true; render(); break;
+    case "close-zoom": S.zoom = null; S._forceRender = true; render(); break;
     case "g-menu": S.menu = true; S._forceRender = true; render(); break;
     case "close-menu": S.menu = false; S._forceRender = true; render(); break;
     case "g-propose-end": jogar("PROPOSE_END"); break;

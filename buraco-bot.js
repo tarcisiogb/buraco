@@ -36,17 +36,26 @@
     if (!canStock) return { type: 'DRAW_DISCARD', player: me };
     if (!canDisc) return { type: 'DRAW_STOCK', player: me };
     if (E.topCardUsable(state, me)) return { type: 'DRAW_DISCARD', player: me };
-    // lixo: vale levar quando várias cartas dele servem (encaixam nos jogos, ou formam par/sequência com a mão)
-    const hand = state.players[me].hand, pile = state.discard;
+    // lixo: levar quando as cartas dele ajudam (encaixam nos jogos ou combinam com a mão)
+    const hand = state.players[me].hand, pile = state.discard, top = pile[pile.length - 1];
     let useful = 0;
     for (const c of pile) {
       if (team.melds.some((m) => E.findAddLayouts(m, c).length)) { useful += 2; continue; }
-      if (hand.some((h) => h.suit === c.suit && h.id !== c.id && near(h, c, 1))) useful++;
-      else if (pile.some((o) => o.id !== c.id && o.suit === c.suit && near(o, c, 1))) useful += 0.5;
+      let adj = 0, gap = 0;
+      for (const h of hand) if (h.suit === c.suit) { if (near(h, c, 1)) adj++; else if (near(h, c, 2)) gap++; }
+      useful += Math.min(2, adj) * 1 + Math.min(2, gap) * 0.4;
+      if (!adj && !gap && pile.some((o) => o.id !== c.id && o.suit === c.suit && near(o, c, 1))) useful += 0.4;
     }
-    const need = pile.length >= 8 ? 1.5 : pile.length >= 4 ? 2.5 : 3;
+    if (top) { // a carta de cima pesa mais: é a que dá para usar já
+      let adjTop = 0; for (const h of hand) if (h.suit === top.suit && near(h, top, 1)) adjTop++;
+      useful += adjTop * 0.5;
+    }
+    const mine = team.mortoTaken, other = state.teams[teamOf((me + 1) % 4)];
+    const behind = state.scores[teamOf((me + 1) % 4)] - state.scores[teamOf(me)] >= 200;
+    const aggr = (mine ? 0 : 1) + (behind ? 1 : 0) + (other.melds.length > team.melds.length + 2 ? 1 : 0);
+    const need = Math.max(1, (pile.length >= 8 ? 1.5 : pile.length >= 4 ? 2 : 2.5) - 0.6 * aggr);
     if (useful >= need) return { type: 'DRAW_DISCARD', player: me };
-    if (pile.length >= 8) return { type: 'DRAW_DISCARD', player: me };
+    if (pile.length >= 7) return { type: 'DRAW_DISCARD', player: me };
     return { type: 'DRAW_STOCK', player: me };
   }
 
@@ -57,10 +66,9 @@
 
   // ───────────── Jogadas na mesa ─────────────
 
-  /** Coringa só quando for para bater (ou em jogo pequeno, se a dupla já tem canastra limpa) */
+  /** Coringa só para bater (ou, no fim do monte, para não ficar preso com pontos na mão) */
   function wildOk(state, me, newSize, action) {
-    const team = state.teams[teamOf(me)];
-    if (newSize <= 6 && hasCleanCanastra(team)) return true;
+    if (state.stock.length <= 2 && newSize <= 5) return true; // último recurso no fim do monte: livra pontos sem sujar canastra
     const ts = trial(state, action);
     return !!(ts && ts.phase === 'ROUND_OVER' && ts.roundResult && ts.roundResult.reason === 'BATIDA');
   }
@@ -129,7 +137,7 @@
       }
     }
     // com um coringa (2) cobrindo um buraco — só se a mão estiver cheia
-    if (hasCleanCanastra(state.teams[teamOf(me)]) || hand.length >= 9) {
+    if (hand.length <= 6 || state.stock.length <= 2) {
       const twos = hand.filter((c) => c.rank === '2');
       if (twos.length) {
         for (const a of hand) for (const b of hand) {
@@ -145,6 +153,7 @@
       let oi = 0;
       opts.forEach((l, i) => { if (wildCount(l.entries) < wildCount(opts[oi].entries)) oi = i; });
       const action = { type: 'LAY_MELD', player: me, cardIds: ids, option: oi };
+      if (wildCount(opts[oi].entries) > 0 && !wildOk(state, me, ids.length, action)) continue;
       if (trial(state, action)) return action;
     }
     return null;
@@ -164,7 +173,7 @@
         if (near(o, c, 1)) keep += 3.2; else if (near(o, c, 2)) keep += 1.6;
       }
       if (myTeam.melds.some((m) => E.findAddLayouts(m, c).length)) keep += 10;
-      if (oppTeam.melds.some((m) => E.findAddLayouts(m, c).length)) keep += 3; // não "alimentar" o adversário
+      if (oppTeam.melds.some((m) => E.findAddLayouts(m, c).length)) keep += 5; // não "alimentar" o adversário
       return { c, keep };
     });
     scored.sort((a, b) => a.keep - b.keep || b.c.id - a.c.id);
