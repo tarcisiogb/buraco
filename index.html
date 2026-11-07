@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Buraco da Família</title>
-<meta name="description" content="Buraco online para jogar em família.">
+<title>Jogos da Família</title>
+<meta name="description" content="Jogos de cartas online para jogar em família.">
 <meta name="theme-color" content="#0f3d2e">
-<meta property="og:title" content="Buraco da Família">
-<meta property="og:description" content="Buraco online para jogar em dupla com a família.">
+<meta property="og:title" content="Jogos da Família">
+<meta property="og:description" content="Jogos de cartas online para jogar com a família.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://tarcisiogb.github.io/buraco/">
 <meta property="og:image" content="https://tarcisiogb.github.io/buraco/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Buraco da Família">
-<meta name="twitter:description" content="Buraco online para jogar em dupla com a família.">
+<meta name="twitter:title" content="Jogos da Família">
+<meta name="twitter:description" content="Jogos de cartas online para jogar com a família.">
 <meta name="twitter:image" content="https://tarcisiogb.github.io/buraco/og-image.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -315,7 +315,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07t";
+var BUILD = "2026-11-07u";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -454,14 +454,14 @@ function render(){
   else if(S.me.status === "pendente") h = viewPending();
   else if(S.me.status === "recusado") h = viewRefused();
   else h = viewApp();
-  app.innerHTML = h + (S.modal ? modalHtml() : "") + (S._inGame ? "" : '<div class="build">Buraco da Família · build '+BUILD+'</div>');
+  app.innerHTML = h + (S.modal ? modalHtml() : "") + (S._inGame ? "" : '<div class="build">Jogos da Família · build '+BUILD+'</div>');
   document.body.classList.toggle("ingame", !!S._inGame);
   if(S._inGame){ layoutFans(); fitMelds(); runAnims(); }
   if(S._inGame && S.game !== botSeen){ botSeen = S.game; botDrive(); }
 }
 function viewLoading(){ return '<div class="loading"><div><div class="spin"></div><p style="margin-top:12px">Carregando…</p></div></div>'; }
 function viewOffline(){ return '<div class="wrap auth">'+brand()+'<div class="msg err">Não consegui carregar o Firebase. Verifique sua conexão e recarregue a página.</div><button class="btn" data-action="reload">Recarregar</button></div>'; }
-function brand(){ return '<div class="brand"><div class="logo">♠</div><h1>Buraco da Família</h1><p>Jogue em dupla com quem você ama</p></div>'; }
+function brand(){ return '<div class="brand"><div class="logo">♠</div><h1>Jogos da Família</h1><p>Jogue com quem você ama</p></div>'; }
 
 function viewAuth(){
   var f = S.form || {}, h = ['<div class="wrap auth">', brand(), '<div class="panel">'];

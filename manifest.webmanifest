@@ -1,7 +1,7 @@
 {
-  "name": "Buraco da Família",
-  "short_name": "Buraco",
-  "description": "Buraco online para jogar em família",
+  "name": "Jogos da Família",
+  "short_name": "Jogos",
+  "description": "Jogos de cartas online para jogar em família",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
