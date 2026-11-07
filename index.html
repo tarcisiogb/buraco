@@ -314,7 +314,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07q";
+var BUILD = "2026-11-07r";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -525,7 +525,7 @@ function nomeJogador(uid){
   var p = playerByUid(uid); return p ? (p.apelido || primeiro(p.nome)) : "Ex-jogador";
 }
 function avatarRk(uid){
-  if(isBot(uid)) return '<div class="av sm">🤖</div>';
+  if(isBot(uid)) return botIcon(uid).replace('class="av"','class="av sm"');
   var p = playerByUid(uid); return '<div class="av sm">'+(p && p.foto ? '<img src="'+esc(p.foto)+'" alt="">' : esc(p ? initials(p.nome) : "?"))+'</div>';
 }
 var MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
@@ -892,6 +892,8 @@ function estadoRef(mid){ return mesasCol().doc(mid).collection("estado").doc("at
 function mesaAtual(){ if(!S.mesas) return null; for(var i=0;i<S.mesas.length;i++) if(S.mesas[i].id===S.mesaId) return S.mesas[i]; return null; }
 function mySeat(m){ return (m && S.user && m.seats) ? m.seats.indexOf(S.user.uid) : -1; }
 var BOT_NAMES = ["Rubi","Teo","Lia","Max"];
+var BOT_ICONS = ["🦊","🐻","🐼","🦁"], BOT_BG = ["#fde0d0","#e8d9c4","#e3e8ee","#fbe9b5"];
+function botIcon(uid){ var i = parseInt(String(uid||"").slice(4),10); if(!(i>=0&&i<4)) i = 0; return '<div class="av" style="background:'+BOT_BG[i]+';font-size:1.2em">'+BOT_ICONS[i]+'</div>'; }
 function isBot(uid){ return typeof uid === "string" && uid.indexOf("bot:") === 0; }
 function botPlayer(uid){ var n = BOT_NAMES[parseInt(uid.slice(4),10)] || "Bot"; return { id:uid, nome:"Robô "+n, apelido:n, foto:"", bot:true }; }
 function playerByUid(uid){ if(isBot(uid)) return botPlayer(uid); for(var i=0;i<S.players.length;i++) if(S.players[i].id===uid) return S.players[i]; return null; }
@@ -1032,7 +1034,7 @@ function mesasPanel(){
   h.push('</div>');
   return h.join("");
 }
-function avatarMini(p){ if(p.bot) return '<div class="av">🤖</div>'; return '<div class="av">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':esc(initials(p.nome)))+'</div>'; }
+function avatarMini(p){ if(p.bot) return botIcon(p.id); return '<div class="av">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':esc(initials(p.nome)))+'</div>'; }
 
 /* ── telas: mesa ── */
 function viewMesa(){

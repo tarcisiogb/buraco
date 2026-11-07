@@ -126,6 +126,18 @@
     return ids;
   }
 
+  /** Jogo novo do mesmo naipe e perto de um jogo da dupla: espera a carta que falta, a não ser para bater/abrir/fim do monte */
+  function splitsOwnMeld(state, me, ids) {
+    const hand = state.players[me].hand, tm = state.teams[teamOf(me)];
+    if (hand.length - ids.length <= 1 || state.stock.length <= 2 || (tm.vulnerable && !tm.opened)) return false;
+    const cards = ids.map((id) => hand.find((c) => c.id === id));
+    for (const m of tm.melds) for (const mc of m.cards) {
+      if (mc.rank === '2') continue;
+      for (const c of cards) if (c.suit === mc.suit && c.rank !== '2' && near(c, mc, 3)) return true;
+    }
+    return false;
+  }
+
   function bestLay(state, me) {
     const hand = state.players[me].hand;
     const cands = [];
@@ -154,6 +166,7 @@
       if (!opts.length) continue;
       let oi = 0;
       opts.forEach((l, i) => { if (wildCount(l.entries) < wildCount(opts[oi].entries)) oi = i; });
+      if (splitsOwnMeld(state, me, ids)) continue;
       const action = { type: 'LAY_MELD', player: me, cardIds: ids, option: oi };
       if (wildCount(opts[oi].entries) > 0 && !wildOk(state, me, ids.length, action)) continue;
       if (trial(state, action)) return action;
