@@ -314,11 +314,12 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-engine.js"></script>
 <script src="buraco-bot.js"></script>
 <script src="faroeste-engine.js"></script>
+<script src="faroeste-bot.js"></script>
 <script src="faroeste-art.js"></script>
 <script src="faroeste-ui.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07w";
+var BUILD = "2026-11-07x";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -904,9 +905,9 @@ function mesasCol(){ return db.collection("mesas"); }
 function estadoRef(mid){ return mesasCol().doc(mid).collection("estado").doc("atual"); }
 function mesaAtual(){ if(!S.mesas) return null; for(var i=0;i<S.mesas.length;i++) if(S.mesas[i].id===S.mesaId) return S.mesas[i]; return null; }
 function mySeat(m){ return (m && S.user && m.seats) ? m.seats.indexOf(S.user.uid) : -1; }
-var BOT_NAMES = ["Rubi","Teo","Lia","Max"];
-var BOT_ICONS = ["🦊","🐻","🐼","🦁"], BOT_BG = ["#fde0d0","#e8d9c4","#e3e8ee","#fbe9b5"];
-function botIcon(uid){ var i = parseInt(String(uid||"").slice(4),10); if(!(i>=0&&i<4)) i = 0; return '<div class="av" style="background:'+BOT_BG[i]+';font-size:1.2em">'+BOT_ICONS[i]+'</div>'; }
+var BOT_NAMES = ["Rubi","Teo","Lia","Max","Zeca","Nina","Duda","Beto"];
+var BOT_ICONS = ["🦊","🐻","🐼","🦁","🦉","🐯","🐸","🐵"], BOT_BG = ["#fde0d0","#e8d9c4","#e3e8ee","#fbe9b5","#e6dcf0","#fde6c8","#d9efd3","#f0dccb"];
+function botIcon(uid){ var i = parseInt(String(uid||"").slice(4),10); if(!(i>=0&&i<8)) i = 0; return '<div class="av" style="background:'+BOT_BG[i]+';font-size:1.2em">'+BOT_ICONS[i]+'</div>'; }
 function isBot(uid){ return typeof uid === "string" && uid.indexOf("bot:") === 0; }
 function botPlayer(uid){ var n = BOT_NAMES[parseInt(uid.slice(4),10)] || "Bot"; return { id:uid, nome:"Robô "+n, apelido:n, foto:"", bot:true }; }
 function playerByUid(uid){ if(isBot(uid)) return botPlayer(uid); for(var i=0;i<S.players.length;i++) if(S.players[i].id===uid) return S.players[i]; return null; }

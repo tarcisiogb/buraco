@@ -1,7 +1,7 @@
 /* Faroeste — tela, lobby e sincronização (usa os globais do index.html: S, db, esc, toast, etc.) */
 (function () {
   'use strict';
-  var FE = window.FaroesteEngine, FA = window.FaroesteArt;
+  var FE = window.FaroesteEngine, FA = window.FaroesteArt, BOT = window.FaroesteBot;
   var MAXP = 7, MINP = 4;
   var unsub = null, gameFor = null;
   var FW = function () { return (S.fw = S.fw || { game: null, v: 0, sending: false, sel: [], target: null, rules: false, hist: false, zoom: null, pepe: [], pick: null, lastTurn: null }); };
@@ -75,12 +75,21 @@
     var uid = S.user.uid;
     seatTx('stand', function (c) { var i = c.indexOf(uid); if (i < 0) return false; c[i] = null; });
   }
+  function addBots(k) {
+    seatTx('bots', function (c) {
+      var used = c.filter(isBot), free = shuffleArr([0, 1, 2, 3, 4, 5, 6, 7].filter(function (x) { return used.indexOf('bot:' + x) < 0; })), put = 0;
+      for (var i = 0; i < c.length && put < k; i++) if (!c[i]) { c[i] = 'bot:' + free[put++]; }
+      if (!put) return false;
+    });
+  }
+  function rmBot(idx) { seatTx('rmbot' + idx, function (c) { if (!isBot(c[idx])) return false; c[idx] = null; }); }
   function start() {
     var ref = mesasCol().doc(S.mesaId);
     db.runTransaction(function (tx) { return tx.get(ref).then(function (d) {
       if (!d.exists) throw { message: 'Essa mesa não existe mais.' };
       var m = d.data(); if (m.status !== 'aguardando') throw { message: 'A partida já começou.' };
       var seats = m.seats.filter(function (x) { return x; });
+      if (!seats.some(function (x) { return !isBot(x); })) throw { message: 'Precisa de pelo menos um humano.' };
       if (seats.length < MINP) throw { message: 'Precisa de pelo menos ' + MINP + ' jogadores.' };
       var players = seats.map(function (u) { var p = playerByUid(u); return { id: u, name: p ? (p.apelido || primeiro(p.nome)) : '?' }; });
       var st = FE.createGame({ players: players, seed: Math.floor(Math.random() * 4294967296) });
@@ -99,12 +108,13 @@
     h.push('<div class="panel"><div class="eyebrow">Faroeste · de ' + MINP + ' a ' + MAXP + ' jogadores</div><h2 class="ph">Quem vai jogar?</h2><p class="muted" style="margin-top:6px">Cada um recebe um papel secreto. A ordem de chegada define quem fica ao lado de quem.</p>');
     m.seats.forEach(function (u, i) {
       var p = u ? playerByUid(u) : null;
-      h.push('<div class="row">' + (p ? avatarMini(p) : '<div class="av empty">·</div>') + '<div class="grow"><div class="t">' + (p ? esc(p.apelido || primeiro(p.nome)) : 'Vaga ' + (i + 1)) + '</div></div></div>');
+      h.push('<div class="row">' + (p ? avatarMini(p) : '<div class="av empty">·</div>') + '<div class="grow"><div class="t">' + (p ? esc(p.apelido || primeiro(p.nome)) : 'Vaga ' + (i + 1)) + '</div></div>' + (p && p.bot && adm ? '<button class="btn ghost mini" data-action="fw-rmbot" data-id="' + i + '">Tirar</button>' : '') + '</div>');
     });
     h.push('<div class="muted" style="margin:10px 0;text-align:center">' + n + '/' + MAXP + ' jogadores</div>');
     if (me < 0) h.push('<button class="btn gold" data-action="fw-sit"' + (n >= MAXP ? ' disabled' : '') + '>Sentar na mesa</button>');
     else h.push('<button class="btn ghost" data-action="fw-stand">Levantar</button>');
     if (adm) {
+      if (n < MAXP) h.push('<div class="randrow"><span>🤖 Colocar bots:</span>' + [1, 2, 3, 4].map(function (k) { return '<button class="btn ghost mini" data-action="fw-addbots" data-id="' + k + '"' + (k <= MAXP - n ? '' : ' disabled') + '>' + k + '</button>'; }).join('') + '</div>');
       h.push('<button class="btn" data-action="fw-start"' + (n >= MINP ? '' : ' disabled') + '>Começar partida (' + n + ' jogadores)</button>');
       h.push('<button class="btn ghost" data-action="fw-del">Excluir mesa</button>');
     } else h.push('<p class="muted" style="margin-top:12px;text-align:center">Quem criou a mesa começa a partida.</p>');
@@ -354,6 +364,8 @@
       case 'fw-stand': stand(); break;
       case 'fw-start': start(); break;
       case 'fw-del': del(); break;
+      case 'fw-addbots': addBots(parseInt(id, 10)); break;
+      case 'fw-rmbot': rmBot(parseInt(id, 10)); break;
     }
     if (!g || me < 0) return;
     var p = g.players[me];
@@ -404,6 +416,25 @@
     }
   }
 
+  var botTimer = null;
+  function botDrive() {
+    var f = FW(), g = f.game, m = S.lastMesa;
+    if (!g || !m || !S.user || !BOT || g.phase === 'GAME_OVER') return;
+    var me = mySeat(m); if (me < 0) return;
+    var bots = [], humans = [];
+    m.seats.forEach(function (u, i) { if (isBot(u)) bots.push(i); else if (u) humans.push(i); });
+    if (!bots.length) return;
+    var a; try { a = BOT.pendingAction(g, bots); } catch (e) { a = null; }
+    clearTimeout(botTimer); botTimer = null;
+    if (!a) return;
+    var rank = Math.max(0, humans.indexOf(me));
+    botTimer = setTimeout(function () {
+      botTimer = null;
+      if (f.sending || f.game !== g) { f.botSeen = null; S._forceRender = true; render(); return; }
+      var a2; try { a2 = BOT.pendingAction(f.game, bots); } catch (e) { a2 = null; }
+      if (a2) act(a2, true);
+    }, 2200 + rank * 3500);
+  }
   function view(m) {
     var f = FW();
     if (m.status === 'aguardando') { if (gameFor) stop(); return lobbyHtml(m); }
@@ -411,8 +442,10 @@
     if (me < 0) return '<div class="wrap"><div class="panel" style="text-align:center"><h2 class="ph">Partida em andamento</h2><p class="muted" style="margin-top:8px">Você não está sentado nesta mesa.</p><button class="btn ghost" data-action="mesa-back">Voltar</button></div></div>';
     if (gameFor !== S.mesaId) listen(S.mesaId);
     if (!f.game) return '<div class="wrap">' + viewLoading() + '</div>';
-    return gameHtml(m, me);
+    var html = gameHtml(m, me);
+    if (f.botSeen !== f.game) { f.botSeen = f.game; setTimeout(botDrive, 0); }
+    return html;
   }
 
-  window.FaroesteUI = { view: view, handle: handle, stop: stop, rulesHtml: rulesHtml, createMesa: createMesa, MAXP: MAXP };
+  window.FaroesteUI = { view: view, handle: handle, stop: stop, rulesHtml: rulesHtml, createMesa: createMesa, MAXP: MAXP, act: act };
 })();
