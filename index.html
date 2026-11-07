@@ -234,6 +234,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .hrow+.hrow{height:calc(var(--cw)*1.04 + 2px)}
 .hrow .pc{height:calc(var(--cw)*1.04);overflow:hidden;border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:0}
 .stackcards .pc{height:calc(var(--cw)*1.02);overflow:hidden;border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:0}
+.pc b{display:block;height:calc(var(--cw,44px)*.42);line-height:calc(var(--cw,44px)*.42)}
 .pc.t10 b{font-size:calc(var(--cw,44px)*.34);letter-spacing:-.06em}
 .pc.wild:after{bottom:0}
 .mhalf.dense .stackcards .pc+.pc{margin-left:calc(var(--cw)*-.62)}
@@ -314,7 +315,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07r";
+var BUILD = "2026-11-07s";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
