@@ -299,6 +299,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 .medal.bronze{border-color:#cd7f32;background:#fbf0e4}.medal.bronze .mbar i{background:#cd7f32}
 .medal.silver{border-color:#9aa5b1;background:#f1f3f5}.medal.silver .mbar i{background:#9aa5b1}
 .medal.gold{border-color:#e6b422;background:#fff6d6;box-shadow:0 0 10px rgba(230,180,34,.45)}.medal.gold .mbar i{background:#e6b422}
+.randrow{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;flex-wrap:wrap}.randrow .btn{width:auto;margin:0;min-width:44px}
 </style>
 </head>
 <body>
@@ -312,7 +313,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07m";
+var BUILD = "2026-11-07n";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -951,6 +952,21 @@ function setBot(idx, on){
     } else if(isBot(seats[idx])) seats[idx] = null; else return false;
   });
 }
+function shuffleArr(a){ a = a.slice(); for(var i=a.length-1;i>0;i--){ var j = Math.floor(Math.random()*(i+1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+function randBots(n){
+  var m0 = mesaAtual(); if(!m0) return;
+  var empties = []; m0.seats.forEach(function(u,i){ if(!u) empties.push(i); });
+  if(!empties.length) return;
+  n = Math.min(n, empties.length);
+  var pos = shuffleArr(empties).slice(0, n), usedNames = m0.seats.filter(isBot), free = shuffleArr([0,1,2,3].filter(function(k){ return usedNames.indexOf("bot:"+k) < 0; })).slice(0, n);
+  function put(seats){ var used = seats.filter(isBot); pos.forEach(function(idx, k){ if(!seats[idx]){ var nm = "bot:" + free[k]; if(used.indexOf(nm) >= 0) nm = "bot:" + [0,1,2,3].filter(function(q){ return used.indexOf("bot:"+q) < 0; })[0]; seats[idx] = nm; used.push(nm); } }); }
+  seatOp("randbots", put, function(seats){ put(seats); });
+}
+function shuffleSeats(){
+  var perm = shuffleArr([0,1,2,3]);
+  function go(seats){ var old = seats.slice(); for(var i=0;i<4;i++) seats[perm[i]] = old[i]; }
+  seatOp("shuffle", go, function(seats){ go(seats); });
+}
 function standUp(){
   var uid = S.user.uid;
   seatOp("stand", function(c){ for(var i=0;i<4;i++) if(c[i] === uid) c[i] = null; }, function(seats){
@@ -1033,6 +1049,9 @@ function lobbyHtml(m){
   h.push('<div class="seatgrid"><div></div>'+seat(0)+'<div></div>'+seat(3)+'<div style="text-align:center;font-size:30px">🃏</div>'+seat(1)+'<div></div>'+seat(2)+'<div></div></div>');
   h.push('<div class="muted" style="margin-top:12px;text-align:center">'+m.seats.filter(function(x){return x;}).length+'/4 jogadores</div>');
   if(m.criadoPor === S.user.uid || isMaster()){
+    var nEmp = m.seats.filter(function(x){ return !x; }).length;
+    if(nEmp > 0) h.push('<div class="randrow"><span>🎲 Bots em lugares sorteados:</span>'+[1,2,3].map(function(n){ return '<button class="btn ghost mini" data-action="rand-bots" data-id="'+n+'"'+(n<=nEmp?"":" disabled")+'>'+n+'</button>'; }).join("")+'</div>');
+    if(m.seats.some(function(x){ return x; })) h.push('<button class="btn ghost" data-action="shuffle-seats">🔀 Sortear lugares de todos</button>');
     h.push('<button class="btn" data-action="start-match"'+(canStart?"":" disabled")+'>Começar partida</button>');
     h.push('<button class="btn ghost" data-action="del-mesa">Excluir mesa</button>');
   } else h.push('<p class="muted" style="margin-top:12px;text-align:center">Quem criou a mesa começa a partida.</p>');
@@ -1576,6 +1595,8 @@ document.addEventListener("click", function(ev){
     case "mesa-back": closeMesa(); break;
     case "sit": sitAt(parseInt(id,10)); break;
     case "stand": standUp(); break;
+    case "rand-bots": randBots(parseInt(id,10)); break;
+    case "shuffle-seats": shuffleSeats(); break;
     case "add-bot": setBot(parseInt(id,10), true); break;
     case "rm-bot": setBot(parseInt(id,10), false); break;
     case "start-match": startMatch(); break;
