@@ -300,7 +300,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07h";
+var BUILD = "2026-11-07i";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -503,7 +503,7 @@ function viewRefused(){
 /* App aprovado */
 
 /* ── ranking ── */
-S.partidas = null; S.rk = { view:"jog", sort:"pts", bots:true, dsort:"v" };
+S.partidas = null; S.rk = { view:"jog", sort:"pts", bots:true, dsort:"v", mes:"all" };
 var RK_PTS = { v:10, q:2, bat:1 };
 function nomeJogador(uid){
   if(isBot(uid)) return botPlayer(uid).nome;
@@ -513,6 +513,10 @@ function avatarRk(uid){
   if(isBot(uid)) return '<div class="av sm">🤖</div>';
   var p = playerByUid(uid); return '<div class="av sm">'+(p && p.foto ? '<img src="'+esc(p.foto)+'" alt="">' : esc(p ? initials(p.nome) : "?"))+'</div>';
 }
+var MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+function dataPartida(m){ var f = m && m.fim; if(f && typeof f.toDate === "function") return f.toDate(); if(f && f.seconds) return new Date(f.seconds * 1000); return new Date(); }
+function mesKey(d){ return d.getFullYear() + "-" + (d.getMonth() < 9 ? "0" : "") + (d.getMonth() + 1); }
+function mesLabel(k){ var a = k.split("-"); return MESES[parseInt(a[1],10) - 1] + "/" + a[0]; }
 function computeStats(list){
   var pl = {}, du = {};
   function P(id){ return pl[id] || (pl[id] = { id:id, p:0, v:0, q:0, maos:0, bat:0 }); }
@@ -537,8 +541,13 @@ function rkHead(id, label, cur){ return '<th class="'+(cur===id?"on":"")+'" data
 function viewRanking(){
   var h = ['<div class="panel rkp"><div class="eyebrow" style="padding-left:6px">Ranking</div><h2 class="ph" style="padding-left:6px">Quem manda no buraco</h2>'];
   if(S.partidas === null){ h.push('<p class="muted" style="margin-top:10px">Carregando…</p></div>'); return h.join(""); }
-  var st = computeStats(S.partidas), rk = S.rk;
+  var rk = S.rk, meses = {}; S.partidas.forEach(function(m){ meses[mesKey(dataPartida(m))] = 1; });
+  var mesList = Object.keys(meses).sort().reverse(); if(rk.mes !== "all" && !meses[rk.mes]) rk.mes = "all";
+  var filtradas = rk.mes === "all" ? S.partidas : S.partidas.filter(function(m){ return mesKey(dataPartida(m)) === rk.mes; });
+  var st = computeStats(filtradas);
   h.push('<div class="seg"><button class="'+(rk.view==="jog"?"on":"")+'" data-action="rk-view" data-id="jog">Jogadores</button><button class="'+(rk.view==="dup"?"on":"")+'" data-action="rk-view" data-id="dup">Duplas</button></div>');
+  h.push('<label class="f" style="margin-top:12px">Período<select class="in" data-action="rk-mes"><option value="all"'+(rk.mes==="all"?" selected":"")+'>Geral (histórico completo)</option>'+mesList.map(function(k){ return '<option value="'+k+'"'+(rk.mes===k?" selected":"")+'>'+esc(mesLabel(k))+'</option>'; }).join("")+'</select></label>');
+  if(!filtradas.length){ h.push('<p class="muted" style="margin-top:14px">Nenhuma partida neste período.</p></div>'); return h.join(""); }
   if(!S.partidas.length){ h.push('<p class="muted" style="margin-top:14px">Nenhuma partida concluída ainda. O ranking começa a contar quando uma partida chega ao fim (encerramento antecipado não conta).</p></div>'); return h.join(""); }
   if(rk.view === "jog"){
     var rows = st.jog.filter(function(s){ return rk.bots || !isBot(s.id); });
@@ -1404,6 +1413,9 @@ document.addEventListener("pointermove", function(ev){
 document.addEventListener("pointerup", dragEnd);
 document.addEventListener("pointercancel", dragEnd);
 window.addEventListener("pointerup", dragEnd);
+document.addEventListener("change", function(ev){
+  var el = ev.target; if(el && el.getAttribute && el.getAttribute("data-action") === "rk-mes"){ S.rk.mes = el.value; S._forceRender = true; render(); }
+});
 document.addEventListener("click", function(ev){
   if(S.noClickUntil && Date.now() < S.noClickUntil && ev.target.closest && ev.target.closest(".hrow")){ ev.stopPropagation(); return; }
   var el = ev.target.closest("[data-action]"); if(!el) return;
