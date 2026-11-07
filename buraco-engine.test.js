@@ -771,5 +771,25 @@ test('vulnerável: estourar o tempo com descida incompleta desfaz e descarta', (
   assert.strictEqual(t.state.opening, null); assert.strictEqual(t.state.teams.A.melds.length, 0);
 });
 
+test('2 no lugar natural pode virar coringa para encaixar uma carta com buraco (2-3-4 + 6)', () => {
+  const s = fresh({ config: { drawSeconds: 0, playSeconds: 0 } });
+  const m = addMeld(s, 'A', '2D 3D 4D');
+  const six = K('6D')[0];
+  s.players[0].hand = [six, ...K('9C 9H')]; s.phase = 'PLAYING'; s.turn = { player: 0, deadline: null, drewFrom: 'STOCK' };
+  const opts = E.getAddOptions(s, 0, m.id, six.id);
+  assert(opts.length >= 1, 'deveria permitir');
+  const r = must(play(s, { type: 'ADD_TO_MELD', player: 0, meldId: m.id, cardId: six.id, option: 0 }));
+  const meld = r.teams.A.melds[0];
+  assert.strictEqual(meld.cards.length, 4);
+  assert.strictEqual(meld.cards.filter((e) => e.wild).length, 1);
+  assert.deepStrictEqual(meld.cards.map((e) => e.pos), [3, 4, 5, 6]);
+});
+test('2 natural continua natural quando a carta encaixa sem buraco (2-3-4 + 5)', () => {
+  const s = fresh({ config: { drawSeconds: 0, playSeconds: 0 } });
+  const m = addMeld(s, 'A', '2D 3D 4D');
+  const five = K('5D')[0];
+  const opts = E.findAddLayouts(m, five);
+  assert.strictEqual(opts[0].wilds, 0);
+});
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);

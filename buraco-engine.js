@@ -229,6 +229,14 @@
       if (card.suit !== suit) return [];
       for (const pos of rankPositions(card.rank)) {
         results.push(...solveLayouts(suit, [...fixed, { card, pos }], movable));
+        // o 2 do mesmo naipe que está no lugar natural (posição 2) também pode virar coringa e tapar um buraco
+        if (movable.length === 0) {
+          const two = fixed.find((f) => f.card.rank === '2' && f.pos === 2);
+          if (two) {
+            const rest = fixed.filter((f) => f !== two);
+            results.push(...solveLayouts(suit, [...rest, { card, pos }], [two.card]));
+          }
+        }
       }
     }
     return finalizeLayouts(suit, results);
