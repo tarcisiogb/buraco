@@ -312,7 +312,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="buraco-bot.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07k";
+var BUILD = "2026-11-07l";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -924,7 +924,7 @@ function setBot(idx, on){
   db.runTransaction(function(tx){ return tx.get(ref).then(function(d){
     if(!d.exists) return; var m = d.data(); if(m.status !== "aguardando") throw {message:"A partida já começou."};
     var seats = m.seats.slice();
-    if(on){ if(seats[idx]) throw {message:"Esse lugar já foi ocupado."}; seats[idx] = "bot:" + idx; }
+    if(on){ if(seats[idx]) throw {message:"Esse lugar já foi ocupado."}; var livres = [0,1,2,3].filter(function(n){ return seats.indexOf("bot:" + n) < 0; }); seats[idx] = "bot:" + livres[Math.floor(Math.random() * livres.length)]; }
     else if(isBot(seats[idx])) seats[idx] = null;
     tx.update(ref, {seats:seats});
   }); }).catch(toastErr);
