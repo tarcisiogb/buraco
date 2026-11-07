@@ -313,9 +313,12 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="buraco-engine.js"></script>
 <script src="buraco-bot.js"></script>
+<script src="faroeste-engine.js"></script>
+<script src="faroeste-art.js"></script>
+<script src="faroeste-ui.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07v";
+var BUILD = "2026-11-07w";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -697,7 +700,7 @@ function viewApp(){
   h.push(tabBtn("inicio","Início")); h.push(tabBtn("ranking","Ranking")); h.push(tabBtn("regras","Regras")); h.push(tabBtn("perfil","Meu cadastro"));
   if(isMaster()) h.push(tabBtn("admin","Administração", pend));
   h.push('</div>');
-  if(S.tab === "regras") h.push('<div class="card">'+regrasHtml()+'</div>'); else if(S.tab === "ranking") h.push(viewRanking());
+  if(S.tab === "regras") h.push('<div class="card">'+regrasHtml()+(window.FaroesteUI?'<div style="margin-top:18px">'+FaroesteUI.rulesHtml()+'</div>':"")+'</div>'); else if(S.tab === "ranking") h.push(viewRanking());
   else if(S.tab === "perfil") h.push(viewPerfil());
   else if(S.tab === "admin" && isMaster()) h.push(viewAdmin());
   else h.push(viewInicio());
@@ -721,7 +724,7 @@ function tabBtn(id, label, dot){ return '<button class="tab'+(S.tab===id?" on":"
 
 var GAMES = [
   { id:"buraco", ic:"🃏", nome:"Buraco", desc:"Buraco Aberto · 4 jogadores, 2 duplas", ok:true },
-  { id:"faroeste", ic:"🤠", nome:"Faroeste", desc:"Duelo de xerife, foras da lei e renegado · 4 a 7 jogadores", ok:false }
+  { id:"faroeste", ic:"🤠", nome:"Faroeste", desc:"Xerife, ajudantes, bandidos e renegado · 4 a 7 jogadores", ok:true }
 ];
 function gamesPanel(){
   return '<div class="panel"><div class="eyebrow">Jogos</div><h2 class="ph">Central de jogos da família</h2>'+GAMES.map(function(g){
@@ -1016,7 +1019,7 @@ function deleteMesa(){
   var id = S.mesaId; if(!confirm("Excluir esta mesa?")) return;
   estadoRef(id).delete().catch(function(){}).then(function(){ return mesasCol().doc(id).delete(); }).then(function(){ closeMesa(); }).catch(toastErr);
 }
-function closeMesa(){ stopGame(); S.mesaId = null; S.lastMesa = null; S._forceRender = true; render(); }
+function closeMesa(){ if(window.FaroesteUI) FaroesteUI.stop(); stopGame(); S.mesaId = null; S.lastMesa = null; S._forceRender = true; render(); }
 
 /* ── jogadas ── */
 
@@ -1030,14 +1033,14 @@ function closeMesa(){ stopGame(); S.mesaId = null; S.lastMesa = null; S._forceRe
 function mesasPanel(){
   var h = ['<div class="panel"><div class="eyebrow">Mesas</div><h2 class="ph">Vamos jogar?</h2>'];
   h.push('<label class="f">Nome da mesa (opcional)<input class="in" id="mesa_nome" maxlength="30" placeholder="ex.: Mesa da vó"></label>');
-  h.push('<button class="btn gold" data-action="mesa-criar">+ Criar mesa</button>');
+  h.push('<div style="display:flex;gap:8px"><button class="btn gold" data-action="mesa-criar">🃏 Mesa de Buraco</button><button class="btn gold" data-action="fw-create">🤠 Mesa de Faroeste</button></div>');
   var list = S.mesas || [], any = false;
   list.forEach(function(m){
     var mine = mySeat(m) >= 0; if(m.status === "jogando" && !mine && false) return;
-    var avs = ""; for(var i=0;i<4;i++){ var p = m.seats[i] ? playerByUid(m.seats[i]) : null; avs += p ? avatarMini(p) : '<div class="av empty">·</div>'; }
+    var avs = ""; for(var i=0;i<m.seats.length;i++){ if(m.jogo==="faroeste" && !m.seats[i]) continue; var p = m.seats[i] ? playerByUid(m.seats[i]) : null; avs += p ? avatarMini(p) : '<div class="av empty">·</div>'; }
     var n = m.seats.filter(function(x){ return x; }).length;
     if(!any){ h.push('<div style="margin-top:16px" class="eyebrow">Mesas abertas</div>'); any = true; }
-    h.push('<div class="mesaitem"><div class="avs">'+avs+'</div><div class="grow" style="flex:1;min-width:0"><div style="font-weight:700">'+esc(m.nome||"Mesa")+'</div><div class="muted">'+(m.status==="jogando"?(m.pausada?"⏸ Pausada — retome quando quiser":"Em andamento"):n+"/4 jogadores")+'</div></div>'+
+    h.push('<div class="mesaitem"><div class="avs">'+avs+'</div><div class="grow" style="flex:1;min-width:0"><div style="font-weight:700">'+esc(m.nome||"Mesa")+'</div><div class="muted">'+(m.status==="jogando"?(m.pausada?"⏸ Pausada — retome quando quiser":"Em andamento"):n+"/"+(m.jogo==="faroeste"?"7":"4")+" jogadores")+(m.jogo==="faroeste"?" · Faroeste":"")+'</div></div>'+
       '<button class="btn small '+(mine&&m.status==="jogando"?"gold":"ghost")+'" data-action="mesa-abrir" data-id="'+m.id+'">'+(mine&&m.status==="jogando"?(m.pausada?"Retomar":"Voltar ao jogo"):(m.status==="jogando"?"Ver":"Entrar"))+'</button></div>');
   });
   if(!any) h.push('<p class="muted" style="margin-top:14px">Nenhuma mesa aberta. Crie a primeira!</p>');
@@ -1054,6 +1057,7 @@ function viewMesa(){
   if(!m && S.pendingMesa === S.mesaId && Date.now() - S.pendingAt < 6000) return '<div class="wrap">'+viewLoading()+'</div>';
   if(!m && !(S.game && gameFor === S.mesaId)){ S.mesaId = null; stopGame(); return null; }
   m = m || S.lastMesa;
+  if(m.jogo === "faroeste" && window.FaroesteUI) return FaroesteUI.view(m);
   ensureGameListener();
   if(m.status === "aguardando") return lobbyHtml(m);
   var me = mySeat(m);
@@ -1615,6 +1619,7 @@ document.addEventListener("click", function(ev){
   var el = ev.target.closest("[data-action]"); if(!el) return;
   var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist" || da0 === "close-rules") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
   var act = el.getAttribute("data-action"), id = el.getAttribute("data-id");
+  if(act.indexOf("fw-") === 0){ if(window.FaroesteUI) FaroesteUI.handle(act, id); return; }
   switch(act){
     case "reload": location.reload(); break;
     case "mesa-criar": criarMesa(); break;

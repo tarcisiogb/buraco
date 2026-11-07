@@ -75,7 +75,7 @@
   function createGame(opts) {
     const n = opts.players.length;
     if (n < 4 || n > 7) throw new Error('4 a 7 jogadores');
-    const s = { seed: opts.seed == null ? Date.now() | 0 : opts.seed, phase: 'PLAYING', players: [], deck: [], discard: [], stack: [], turn: null, winner: null, log: [] };
+    const s = { seed: opts.seed == null ? Date.now() | 0 : opts.seed, phase: 'PLAYING', players: [], deck: [], discard: [], stack: [], turn: null, winner: null, log: [], kills: {} };
     const roles = shuffle(s, ROLES[n].slice());
     const chars = shuffle(s, CHARS.slice()).slice(0, n);
     s.deck = buildDeck(s);
@@ -253,6 +253,7 @@
     const s = c.s;
     p.alive = false; p.hp = 0;
     emit(c, 'ELIMINATED', { seat: p.seat, role: p.role, by: killer });
+    if (killer != null && killer !== p.seat) s.kills[killer] = (s.kills[killer] || 0) + 1;
     const cards = p.hand.splice(0).concat(p.equip.splice(0));
     const sam = alive(s).find((q) => hasChar(q, 'abutre'));
     if (sam) { sam.hand.push.apply(sam.hand, cards); emit(c, 'LOOT', { seat: sam.seat, n: cards.length }); }
@@ -376,6 +377,7 @@
       }
       proceed(c);
       afterAction(c);
+      s.log = (s.log || []).concat(c.ev.filter((e) => e.type !== 'DRAW' && e.type !== 'RESPOND' && e.type !== 'STORE_PICK')).slice(-40);
       return { ok: true, state: s, events: c.ev, error: null };
     } catch (e) {
       if (e instanceof Err) return { ok: false, state: state, events: [], error: e.message };
