@@ -319,7 +319,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="faroeste-ui.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07x";
+var BUILD = "2026-11-07y";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -395,6 +395,10 @@ function listenPartidas(){
     S.partidas = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
     if(S.tab === "ranking" || S.tab === "perfil") render();
   }, function(){ S.partidas = S.partidas || []; });
+  db.collection("partidasFaroeste").onSnapshot(function(snap){
+    S.partidasFW = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
+    if(S.tab === "ranking") render();
+  }, function(){ S.partidasFW = S.partidasFW || []; });
 }
 function registrarPartida(st, m){
   try{
@@ -523,7 +527,7 @@ function viewRefused(){
 /* App aprovado */
 
 /* ── ranking ── */
-S.partidas = null; S.rk = { view:"jog", sort:"pts", bots:true, dsort:"v", mes:"all" };
+S.partidas = null; S.partidasFW = null; S.rk = { game:"buraco", fsort:"pts", view:"jog", sort:"pts", bots:true, dsort:"v", mes:"all" };
 var RK_PTS = { v:10, q:2, bat:1 };
 function nomeJogador(uid){
   if(isBot(uid)) return botPlayer(uid).nome;
@@ -558,8 +562,42 @@ function computeStats(list){
   return { jog:jog, dup:dup };
 }
 function rkHead(id, label, cur){ return '<th class="'+(cur===id?"on":"")+'" data-action="rk-sort" data-id="'+id+'">'+label+(cur===id?" ▾":"")+'</th>'; }
+function rkGameSeg(){ var g = S.rk.game; return '<div class="seg" style="margin-bottom:10px"><button class="'+(g==="buraco"?"on":"")+'" data-action="rk-game" data-id="buraco">🃏 Buraco</button><button class="'+(g==="faroeste"?"on":"")+'" data-action="rk-game" data-id="faroeste">🤠 Faroeste</button></div>'; }
+var FW_PAPEL = { xerife:"Xerife", ajudante:"Ajudante", bandido:"Bandido", renegado:"Renegado" };
+function viewRankingFW(){
+  var h = ['<div class="panel rkp"><div class="eyebrow" style="padding-left:6px">Ranking</div><h2 class="ph" style="padding-left:6px">Quem manda no Faroeste</h2>', rkGameSeg()];
+  if(S.partidasFW === null){ h.push('<p class="muted">Carregando…</p></div>'); return h.join(""); }
+  var rk = S.rk, meses = {}; S.partidasFW.forEach(function(m){ meses[mesKey(dataPartida(m))] = 1; });
+  var mesList = Object.keys(meses).sort().reverse(); if(rk.mes !== "all" && !meses[rk.mes]) rk.mes = "all";
+  var list = rk.mes === "all" ? S.partidasFW : S.partidasFW.filter(function(m){ return mesKey(dataPartida(m)) === rk.mes; });
+  h.push('<label class="f">Período<select class="in" data-action="rk-mes"><option value="all"'+(rk.mes==="all"?" selected":"")+'>Geral (histórico completo)</option>'+mesList.map(function(k){ return '<option value="'+k+'"'+(rk.mes===k?" selected":"")+'>'+esc(mesLabel(k))+'</option>'; }).join("")+'</select></label>');
+  if(!list.length){ h.push('<p class="muted" style="margin-top:14px">Nenhuma partida de Faroeste concluída'+(rk.mes==="all"?" ainda":" neste período")+'. O ranking conta quando uma partida chega ao fim.</p></div>'); return h.join(""); }
+  var T = {};
+  list.forEach(function(m){
+    (m.jogadores||[]).forEach(function(uid, i){
+      if(!uid) return;
+      var t = T[uid] = T[uid] || { id:uid, p:0, v:0, ab:0, pct:0, pts:0, pap:{ xerife:[0,0], ajudante:[0,0], bandido:[0,0], renegado:[0,0] } };
+      var papel = (m.papeis||[])[i], w = !!(m.venceu||[])[i];
+      t.p++; if(w) t.v++; t.ab += ((m.abates||[])[i]||0);
+      if(t.pap[papel]){ t.pap[papel][1]++; if(w) t.pap[papel][0]++; }
+    });
+  });
+  var rows = Object.keys(T).map(function(k){ var t = T[k]; t.pct = t.p ? Math.round(t.v*100/t.p) : 0; t.pts = t.v*3 + t.ab; return t; }).filter(function(t){ return rk.bots || !isBot(t.id); });
+  var key = rk.fsort; rows.sort(function(a,b){ return (b[key]-a[key]) || (b.pts-a.pts) || (b.v-a.v) || (a.p-b.p); });
+  h.push('<label class="chk"><input type="checkbox" '+(rk.bots?"checked":"")+' data-action="rk-bots"> Mostrar bots</label>');
+  h.push('<div class="rkwrap"><table class="rk"><tr><th>#</th><th class="l">Jogador</th>'+['pts:Pts','p:Part','v:Vit.','pct:%','ab:Abates'].map(function(x){ var a = x.split(":"); return '<th class="'+(key===a[0]?"on":"")+'" data-action="rk-fsort" data-id="'+a[0]+'">'+a[1]+(key===a[0]?" ▾":"")+'</th>'; }).join("")+'</tr>');
+  rows.forEach(function(t, i){
+    h.push('<tr class="'+(S.user && t.id===S.user.uid?"me":"")+'"><td>'+(i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1))+'</td><td class="l"><span class="rkn">'+avatarRk(t.id)+'<span>'+esc(nomeJogador(t.id))+'</span></span></td><td><b>'+t.pts+'</b></td><td>'+t.p+'</td><td>'+t.v+'</td><td>'+t.pct+'%</td><td>'+t.ab+'</td></tr>');
+  });
+  h.push('</table></div>');
+  h.push('<div class="eyebrow" style="margin-top:14px;padding-left:6px">Vitórias por papel</div><div class="rkwrap"><table class="rk"><tr><th class="l">Jogador</th><th>Xerife</th><th>Ajud.</th><th>Band.</th><th>Reneg.</th></tr>');
+  rows.forEach(function(t){ h.push('<tr class="'+(S.user && t.id===S.user.uid?"me":"")+'"><td class="l"><span class="rkn">'+avatarRk(t.id)+'<span>'+esc(nomeJogador(t.id))+'</span></span></td>'+["xerife","ajudante","bandido","renegado"].map(function(r){ return '<td>'+t.pap[r][0]+'/'+t.pap[r][1]+'</td>'; }).join("")+'</tr>'); });
+  h.push('</table></div><p class="muted" style="margin-top:10px;font-size:12px">Pontuação = 3 por vitória + 1 por abate. Papéis: vitórias/partidas naquele papel. Toque no título da coluna para ordenar.</p></div>');
+  return h.join("");
+}
 function viewRanking(){
-  var h = ['<div class="panel rkp"><div class="eyebrow" style="padding-left:6px">Ranking</div><h2 class="ph" style="padding-left:6px">Quem manda no buraco</h2>'];
+  if(S.rk.game === "faroeste") return viewRankingFW();
+  var h = ['<div class="panel rkp"><div class="eyebrow" style="padding-left:6px">Ranking</div><h2 class="ph" style="padding-left:6px">Quem manda no buraco</h2>', rkGameSeg()];
   if(S.partidas === null){ h.push('<p class="muted" style="margin-top:10px">Carregando…</p></div>'); return h.join(""); }
   var rk = S.rk, meses = {}; S.partidas.forEach(function(m){ meses[mesKey(dataPartida(m))] = 1; });
   var mesList = Object.keys(meses).sort().reverse(); if(rk.mes !== "all" && !meses[rk.mes]) rk.mes = "all";
@@ -1056,7 +1094,7 @@ function viewMesa(){
   var m = mesaAtual();
   if(m) S.lastMesa = m;
   if(!m && S.pendingMesa === S.mesaId && Date.now() - S.pendingAt < 6000) return '<div class="wrap">'+viewLoading()+'</div>';
-  if(!m && !(S.game && gameFor === S.mesaId)){ S.mesaId = null; stopGame(); return null; }
+  if(!m && !(S.game && gameFor === S.mesaId) && !(S.fw && S.fw.game && S.lastMesa && S.lastMesa.id === S.mesaId)){ S.mesaId = null; stopGame(); return null; }
   m = m || S.lastMesa;
   if(m.jogo === "faroeste" && window.FaroesteUI) return FaroesteUI.view(m);
   ensureGameListener();
@@ -1618,7 +1656,7 @@ document.addEventListener("change", function(ev){
 document.addEventListener("click", function(ev){
   if(S.noClickUntil && Date.now() < S.noClickUntil && ev.target.closest && ev.target.closest(".hrow")){ ev.stopPropagation(); return; }
   var el = ev.target.closest("[data-action]"); if(!el) return;
-  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist" || da0 === "close-rules") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
+  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || /^fw-.*-close$/.test(da0) || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist" || da0 === "close-rules") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
   var act = el.getAttribute("data-action"), id = el.getAttribute("data-id");
   if(act.indexOf("fw-") === 0){ if(window.FaroesteUI) FaroesteUI.handle(act, id); return; }
   switch(act){
@@ -1660,6 +1698,8 @@ document.addEventListener("click", function(ev){
     case "pick-opt": pickOption(parseInt(id,10)); break;
     case "pick-cancel": S.picker = null; S._forceRender = true; render(); break;
     case "g-next": jogar("START_NEXT_ROUND"); break;
+    case "rk-game": S.rk.game = id; S._forceRender = true; render(); break;
+    case "rk-fsort": S.rk.fsort = id; S._forceRender = true; render(); break;
     case "rk-view": S.rk.view = id; S._forceRender = true; render(); break;
     case "rk-sort": S.rk.sort = id; S._forceRender = true; render(); break;
     case "rk-dsort": S.rk.dsort = id; S._forceRender = true; render(); break;

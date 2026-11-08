@@ -225,6 +225,46 @@
     for (var i = L.length - 1; i >= 0 && out.length < n; i--) { var t = evText(g, L[i]); if (t) out.push(t); }
     return out;
   }
+  var DESC = {
+    tiro: 'Tira 1 vida de um jogador ao alcance da sua arma. O alvo pode se defender com um Errou. Só 1 Tiro por turno (sem restrição com o Repetidor).',
+    errou: 'Defesa: descarte para cancelar um Tiro (ou uma Rajada) contra você. Não pode ser jogada por iniciativa própria.',
+    tonico: 'Recupera 1 vida (nunca acima do máximo). Também pode ser usado fora do turno para evitar a eliminação.',
+    taberna: 'Todos os jogadores vivos recuperam 1 vida.',
+    diligencia: 'Compre 2 cartas do baralho.',
+    carroca: 'Compre 3 cartas do baralho.',
+    armazem: 'Viram-se cartas na mesa, uma por jogador vivo; começando por você, cada um escolhe uma para a mão.',
+    assalto: 'Pegue uma carta de outro jogador (da mão, sorteada, ou de um equipamento dele) a distância 1.',
+    confisco: 'Faça outro jogador, a qualquer distância, descartar uma carta (da mão, sorteada, ou de um equipamento).',
+    rajada: 'Todos os outros jogadores precisam descartar um Errou ou perdem 1 vida.',
+    boiada: 'Todos os outros jogadores precisam descartar um Tiro ou perdem 1 vida.',
+    duelo: 'Desafie qualquer jogador: ele e você descartam Tiros alternadamente, ele primeiro. Quem não puder perde 1 vida.',
+    cavalo: 'Equipamento: os outros jogadores te veem 1 posição mais longe (mais difícil te alcançar).',
+    luneta: 'Equipamento: você enxerga todos 1 posição mais perto (alcança mais longe).',
+    barril: 'Equipamento: ao ser atacado por um Tiro, faça um Saque; se sair ♥ copas, é como se tivesse jogado um Errou.',
+    cadeia: 'Coloque em outro jogador (menos o Xerife). No começo do turno dele, faz-se um Saque: se não sair ♥ copas, ele perde a vez.',
+    dinamite: 'Equipamento: no seu turno faz-se um Saque; ♠ de 2 a 9 explode (3 vidas de dano), senão passa para o próximo jogador.',
+    repetidor: 'Arma de alcance 1. Permite jogar quantos Tiros quiser no turno.',
+    canocurto: 'Arma de alcance 2.',
+    pistolalonga: 'Arma de alcance 3.',
+    carabina: 'Arma de alcance 4.',
+    rifle: 'Arma de alcance 5.'
+  };
+  function cardsHelp() {
+    var order = ['tiro', 'errou', 'tonico', 'taberna', 'diligencia', 'carroca', 'armazem', 'assalto', 'confisco', 'rajada', 'boiada', 'duelo', 'cavalo', 'luneta', 'barril', 'cadeia', 'dinamite', 'repetidor', 'canocurto', 'pistolalonga', 'carabina', 'rifle'];
+    return order.map(function (k) { return '<p><b>' + esc(KINDNAME[k]) + '</b> — ' + esc(DESC[k] || '') + '</p>'; }).join('');
+  }
+  function summaryHtml(g, m, me) {
+    var win = function (p) { return g.winner === 'xerife' ? (p.role === 'xerife' || p.role === 'ajudante') : g.winner === 'bandidos' ? p.role === 'bandido' : p.role === 'renegado'; };
+    var row = function (p) {
+      return '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #00000018"><div><b>' + esc(p.name) + (p.seat === me ? ' (você)' : '') + '</b><br><span style="font-size:12px">' + esc(ROLE_NAME[p.role]) + ' · ' + esc(CHARS[p.char].nome) + '</span></div>' +
+        '<div style="text-align:right;font-size:12px">' + (p.alive ? '❤️ ' + p.hp + ' vida' + (p.hp > 1 ? 's' : '') : '☠️ eliminado') + '<br>🎯 ' + ((g.kills && g.kills[p.seat]) || 0) + ' abate' + (((g.kills && g.kills[p.seat]) || 0) === 1 ? '' : 's') + '</div></div>';
+    };
+    var w = g.players.filter(win), l = g.players.filter(function (p) { return !win(p); });
+    return '<div class="fwmodal"><div class="box" data-stop="1"><h3>🏆 ' + winnerText(g) + '</h3>' +
+      '<div style="font-weight:800;margin-top:6px">Vencedores</div>' + w.map(row).join('') +
+      '<div style="font-weight:800;margin-top:10px">Perdedores</div>' + l.map(row).join('') +
+      '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn gold" data-action="mesa-back">Voltar às mesas</button><button class="btn ghost" data-action="fw-sum-close">Ver a mesa</button></div></div></div>';
+  }
   function winnerText(g) { return g.winner === 'xerife' ? 'O Xerife e os Ajudantes venceram!' : g.winner === 'bandidos' ? 'Os Bandidos venceram!' : 'O Renegado venceu!'; }
 
   // ───────── tela do jogo ─────────
@@ -285,6 +325,7 @@
     prompt = over > 0 ? 'Descarte ' + over + ' carta' + (over > 1 ? 's' : '') + ' para encerrar' : 'Sua vez: jogue cartas ou encerre o turno';
     var c1 = sel[0];
     if (c1 && sel.length === 1) {
+      prompt = KINDNAME[c1.kind] + ': ' + (DESC[c1.kind] || '');
       var k = c1.kind, blue = FE.KINDS[k].t === 'azul';
       var asTiro = (p.char === 'valeria' && k === 'errou');
       if (k === 'errou' && !asTiro) bar += '<button class="btn" disabled>Errou só defende</button>';
@@ -316,6 +357,7 @@
         '<div style="margin-top:6px"><b>' + Math.max(0, z.hp) + '/' + z.maxHp + '</b> vidas · ' + (zp.handCount != null ? zp.handCount : z.hand.length) + ' cartas</div></div>' +
         (z.equip.length ? '<div class="fwcards">' + z.equip.map(function (c) { return '<div>' + FA.cardSvg(c) + '</div>'; }).join('') + '</div>' : '') + '<button class="btn ghost" data-action="fw-zoom-close">Fechar</button></div></div>';
     }
+    if (g.phase === 'GAME_OVER' && !f.nosum) out += summaryHtml(g, S.lastMesa, me);
     if (f.rules) out += '<div class="fwmodal" data-action="fw-rules-close"><div class="box" data-stop="1">' + rulesHtml() + '<button class="btn ghost" data-action="fw-rules-close">Fechar</button></div></div>';
     return out;
   }
@@ -351,7 +393,8 @@
       D('Vida', '<p>Tiro tira 1 vida; o alvo pode jogar Errou. O Tônico cura 1 e, no instante em que você levaria o golpe fatal, pode salvar (não vale com 2 jogadores vivos). Quem chega a 0 é eliminado e mostra o papel.</p>') +
       D('Saque', '<p>Vira a carta do topo e descarta. Barril: copas conta como Errou. Cadeia: copas solta; senão perde a vez. Dinamite: ♠ de 2 a 9 explode (3 vidas); senão passa para o próximo.</p>') +
       D('Recompensas', '<p>Eliminar um Bandido: compra 3 cartas. Xerife que elimina um Ajudante perde todas as cartas.</p>') +
-      D('Fim', '<p>Xerife eliminado: Bandidos vencem (ou o Renegado, se for o único vivo). Bandidos e Renegado eliminados: Xerife e Ajudantes vencem.</p>');
+      D('Fim', '<p>Xerife eliminado: Bandidos vencem (ou o Renegado, se for o único vivo). Bandidos e Renegado eliminados: Xerife e Ajudantes vencem.</p>') +
+      D('Cartas e o que fazem', cardsHelp());
   }
 
   // ───────── ações da interface ─────────
@@ -410,6 +453,7 @@
       case 'fw-hist': f.hist = true; S._forceRender = true; render(); break;
       case 'fw-hist-close': f.hist = false; S._forceRender = true; render(); break;
       case 'fw-rules': f.rules = true; S._forceRender = true; render(); break;
+      case 'fw-sum-close': f.nosum = true; S._forceRender = true; render(); break;
       case 'fw-rules-close': f.rules = false; S._forceRender = true; render(); break;
       case 'fw-zoom': f.zoom = parseInt(id, 10); S._forceRender = true; render(); break;
       case 'fw-zoom-close': f.zoom = null; S._forceRender = true; render(); break;
