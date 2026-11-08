@@ -86,6 +86,7 @@
         lays.forEach((l, i) => { if (wildCount(l.entries) < wildCount(lays[oi].entries)) oi = i; });
         const lay = lays[oi], used = wildCount(lay.entries) - before; // coringas a mais
         if (used > 0 && !wildOk(state, me, size + 1, { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi })) continue;
+        if (addsWild(state, me, { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi })) continue;
         // prioridade: jogos grandes (rumo à canastra), sem gastar coringa
         const score = size * 2 - used * 20 + (size + 1 === 7 ? 6 : 0) + (c.rank === '2' ? -3 : 0);
         if (!best || score > best.score) best = { score, action: { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi } };
@@ -215,7 +216,9 @@
     if (!a || (a.type !== 'ADD_TO_MELD' && a.type !== 'LAY_MELD')) return false;
     const ts = trial(state, a); if (!ts) return false;
     const cnt = (st) => st.teams[teamOf(me)].melds.reduce((n, m) => n + wildCount(m.cards), 0);
-    if (cnt(ts) <= cnt(state)) return false;
+    // a carta jogada ficou como coringa num jogo (mesmo trocando de lugar com outro 2) → trava a limpa
+    const asWild = a.type === 'ADD_TO_MELD' && ts.teams[teamOf(me)].melds.some((m) => m.cards.some((e) => e.wild && e.card.id === a.cardId));
+    if (!asWild && cnt(ts) <= cnt(state)) return false;
     if (ts.phase === 'ROUND_OVER' && ts.roundResult && ts.roundResult.reason === 'BATIDA') return false;
     if (state.stock.length <= 2 && (a.type === 'LAY_MELD' ? a.cardIds.length : 99) <= 5) return false;
     return true;
@@ -237,6 +240,7 @@
       lays.forEach((l, i) => { if (wildCount(l.entries) < wildCount(lays[oi].entries)) oi = i; });
       const a = { type: 'ADD_TO_MELD', player: me, meldId: meld.id, cardId: c.id, option: oi };
       if (wildCount(lays[oi].entries) > wildCount(meld.cards) && !wildOk(state, me, meld.cards.length + 1, a)) continue;
+      if (addsWild(state, me, a)) continue;
       if (trial(state, a)) return a;
     }
     return null;
