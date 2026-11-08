@@ -198,7 +198,21 @@
   // ───────────── Escolha da ação ─────────────
 
   /** Próxima jogada na mesa (encaixar carta ou baixar jogo), ou null */
+  /** Trava final: nenhuma jogada pode aumentar o número de coringas nos jogos da dupla, a não ser para bater */
+  function addsWild(state, me, a) {
+    if (!a || (a.type !== 'ADD_TO_MELD' && a.type !== 'LAY_MELD')) return false;
+    const ts = trial(state, a); if (!ts) return false;
+    const cnt = (st) => st.teams[teamOf(me)].melds.reduce((n, m) => n + wildCount(m.cards), 0);
+    if (cnt(ts) <= cnt(state)) return false;
+    if (ts.phase === 'ROUND_OVER' && ts.roundResult && ts.roundResult.reason === 'BATIDA') return false;
+    if (state.stock.length <= 2 && (a.type === 'LAY_MELD' ? a.cardIds.length : 99) <= 5) return false;
+    return true;
+  }
   function tableAction(state, me) {
+    const t0 = tableAction0(state, me);
+    return addsWild(state, me, t0) ? null : t0;
+  }
+  function tableAction0(state, me) {
     const add = bestAdd(state, me);
     if (add && trial(state, add)) return add;
     const lay = bestLay(state, me);
