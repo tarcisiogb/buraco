@@ -138,6 +138,17 @@
     return false;
   }
 
+  /** Não baixar um jogo novo com a carta que limparia (ocupa a posição do coringa) um jogo sujo do mesmo naipe — só para bater */
+  function blocksClean(state, me, opt, action) {
+    const team = state.teams[teamOf(me)];
+    const wildPos = [];
+    team.melds.forEach((m) => { if (m.suit === opt.suit || (opt.entries[0] && m.suit === opt.entries[0].card.suit)) m.cards.forEach((e) => { if (e.wild) wildPos.push(e.pos); }); });
+    if (!wildPos.length) return false;
+    const hit = opt.entries.some((e) => !e.wild && wildPos.indexOf(e.pos) >= 0);
+    if (!hit) return false;
+    const ts = trial(state, action);
+    return !(ts && ts.phase === 'ROUND_OVER' && ts.roundResult && ts.roundResult.reason === 'BATIDA');
+  }
   function bestLay(state, me) {
     const hand = state.players[me].hand;
     const cands = [];
@@ -167,6 +178,7 @@
       let oi = 0;
       opts.forEach((l, i) => { if (wildCount(l.entries) < wildCount(opts[oi].entries)) oi = i; });
       if (splitsOwnMeld(state, me, ids)) continue;
+      if (blocksClean(state, me, opts[oi], { type: 'LAY_MELD', player: me, cardIds: ids, option: oi })) continue;
       const action = { type: 'LAY_MELD', player: me, cardIds: ids, option: oi };
       if (wildCount(opts[oi].entries) > 0 && !wildOk(state, me, ids.length, action)) continue;
       if (trial(state, action)) return action;
