@@ -839,5 +839,19 @@ test('sem canastra limpa não bate, e a mensagem explica', () => {
   assert.strictEqual(r.ok, false); assert.strictEqual(r.error.code, 'LAST_CARD_RULE');
   assert(/canastra limpa/.test(r.error.message));
 });
+test('lixo de 1 carta: pegar e descartar a mesma carta não vale (seria passar a vez)', () => {
+  const s = fresh(); s.discard = K('9S'); s.players[0].hand = K('2H 5D 7C');
+  const top = s.discard[0];
+  const s2 = must(play(s, { type: 'DRAW_DISCARD', player: 0 }));
+  const r = play(s2, { type: 'DISCARD', player: 0, cardId: top.id });
+  assert.strictEqual(r.ok, false); assert.strictEqual(r.error.code, 'LONE_DISCARD');
+  must(play(s2, { type: 'DISCARD', player: 0, cardId: s2.players[0].hand[0].id })); // outra carta pode
+});
+test('lixo com 2+ cartas: pode descartar a carta de cima depois de pegar', () => {
+  const s = fresh(); s.discard = K('9S 8S'); s.players[0].hand = K('2H 5D 7C');
+  const top = s.discard[1];
+  const s2 = must(play(s, { type: 'DRAW_DISCARD', player: 0 }));
+  must(play(s2, { type: 'DISCARD', player: 0, cardId: top.id }));
+});
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);

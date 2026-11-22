@@ -35,7 +35,8 @@
     if (!canStock && !canDisc) return null;
     if (!canStock) return { type: 'DRAW_DISCARD', player: me };
     if (!canDisc) return { type: 'DRAW_STOCK', player: me };
-    if (E.topCardUsable(state, me)) return { type: 'DRAW_DISCARD', player: me };
+    if (E.topCardUsable(state, me) && canUseTop(state, me)) return { type: 'DRAW_DISCARD', player: me };
+    if (state.discard.length === 1) return { type: 'DRAW_STOCK', player: me }; // carta solta que não dá para usar: não vale trocar
     // lixo: levar quando as cartas dele ajudam (encaixam nos jogos ou combinam com a mão)
     const hand = state.players[me].hand, pile = state.discard, top = pile[pile.length - 1];
     let useful = 0;
@@ -57,6 +58,18 @@
     if (useful >= need) return { type: 'DRAW_DISCARD', player: me };
     if (pile.length >= 7) return { type: 'DRAW_DISCARD', player: me };
     return { type: 'DRAW_STOCK', player: me };
+  }
+
+  /** Simula: se eu pegar o lixo, o bot realmente consegue baixar/encaixar a carta de cima (com todas as travas dele)? */
+  function canUseTop(state, me) {
+    const top = state.discard[state.discard.length - 1];
+    let s = trial(state, { type: 'DRAW_DISCARD', player: me });
+    for (let i = 0; s && i < 8; i++) {
+      if (!s.players[me].hand.some((c) => c.id === top.id)) return true;
+      const a = tableAction(s, me); if (!a) return false;
+      s = trial(s, a);
+    }
+    return !!(s && !s.players[me].hand.some((c) => c.id === top.id));
   }
 
   function near(a, b, d) {

@@ -435,10 +435,12 @@
     const taken = state.discard.length;
     state.pile = state.pile || {};
     state.pile[p.id] = Math.max(state.pile[p.id] || 0, taken); // maior lixo levado por jogador na rodada (medalhas)
+    const lone = taken === 1 ? state.discard[0].id : null; // lixo de 1 carta: pegar e descartar a mesma = passar a vez
     p.hand.push(...state.discard); // leva todas as cartas; sem exigir usar o topo (3.1)
     state.discard = [];
     state.phase = 'PLAYING';
     state.turn.drewFrom = 'DISCARD';
+    state.turn.mustUse = lone;
     state.turn.deadline = deadlineIn(state.config.playSeconds, now);
     events.push({ type: 'DREW_DISCARD', player: p.id, cards: taken });
     return ok();
@@ -542,6 +544,7 @@
     if (state.opening) return fail('OPENING_INCOMPLETE', 'Dupla vulnerável: faltam ' + (state.config.openMin - state.opening.points) + ' pontos para abrir. Baixe mais cartas ou desfaça a descida.');
     const card = p.hand.find((c) => c.id === cardId);
     if (!card) return fail('CARDS_NOT_IN_HAND', 'Carta não está na sua mão.');
+    if (state.turn.mustUse === cardId && p.hand.length > 1) return fail('LONE_DISCARD', 'Você pegou só essa carta do lixo: use-a num jogo ou descarte outra (devolvê-la seria o mesmo que passar a vez).');
     const emptying = p.hand.length === 1;
     const out = emptying ? emptyOutcome(state, p.id) : null;
     if (emptying && out === null) return fail('LAST_CARD_RULE', lastCardMsg(state, p));
