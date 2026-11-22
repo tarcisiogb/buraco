@@ -54,6 +54,17 @@ service cloud.firestore {
       allow delete: if isMaster();
     }
 
+    // Partidas de Blackjack (1 a 6 jogadores, incluindo bots)
+    match /partidasBlackjack/{pid} {
+      allow read: if isApproved();
+      allow create: if isApproved()
+        && request.resource.data.jogadores.size() >= 1
+        && request.resource.data.jogadores.size() <= 6
+        && request.auth.uid in request.resource.data.jogadores;
+      allow update: if false;
+      allow delete: if isMaster();
+    }
+
     // Mesas de jogo: qualquer jogador aprovado cria, senta e le.
     match /mesas/{mid} {
       allow read: if isApproved();
@@ -63,7 +74,13 @@ service cloud.firestore {
       allow update: if isApproved()
         && (resource.data.status == 'aguardando'
             || request.auth.uid in resource.data.seats
-            || isMaster());
+            || isMaster()
+            // Blackjack: um jogador aprovado pode assumir o lugar de um bot no meio da partida
+            || (resource.data.jogo == 'blackjack'
+                && resource.data.status == 'jogando'
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seats', 'jogadores'])
+                && request.auth.uid in request.resource.data.seats
+                && request.resource.data.seats.size() == resource.data.seats.size()));
       allow delete: if isApproved()
         && (resource.data.criadoPor == request.auth.uid || isMaster());
 
@@ -73,7 +90,10 @@ service cloud.firestore {
         allow write: if isApproved()
           && (request.auth.uid in get(/databases/$(database)/documents/mesas/$(mid)).data.seats
               || isMaster()
-              || get(/databases/$(database)/documents/mesas/$(mid)).data.criadoPor == request.auth.uid);
+              || get(/databases/$(database)/documents/mesas/$(mid)).data.criadoPor == request.auth.uid
+              // quem acabou de assumir um lugar de bot no Blackjack (na mesma transação)
+              || (getAfter(/databases/$(database)/documents/mesas/$(mid)).data.jogo == 'blackjack'
+                  && request.auth.uid in getAfter(/databases/$(database)/documents/mesas/$(mid)).data.seats));
       }
     }
   }

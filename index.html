@@ -317,9 +317,12 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="faroeste-bot.js"></script>
 <script src="faroeste-art.js"></script>
 <script src="faroeste-ui.js"></script>
+<script src="blackjack-engine.js"></script>
+<script src="blackjack-bot.js"></script>
+<script src="blackjack-ui.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-07x2";
+var BUILD = "2026-11-22a";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
@@ -395,6 +398,10 @@ function listenPartidas(){
     S.partidas = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
     if(S.tab === "ranking" || S.tab === "perfil") render();
   }, function(){ S.partidas = S.partidas || []; });
+  db.collection("partidasBlackjack").onSnapshot(function(snap){
+    S.partidasBJ = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
+    if(S.tab === "ranking") render();
+  }, function(){ S.partidasBJ = S.partidasBJ || []; });
   db.collection("partidasFaroeste").onSnapshot(function(snap){
     S.partidasFW = snap.docs.map(function(d){ var o = d.data(); o.id = d.id; return o; });
     if(S.tab === "ranking") render();
@@ -527,7 +534,7 @@ function viewRefused(){
 /* App aprovado */
 
 /* ── ranking ── */
-S.partidas = null; S.partidasFW = null; S.rk = { game:"buraco", fsort:"pts", view:"jog", sort:"pts", bots:true, dsort:"v", mes:"all" };
+S.partidas = null; S.partidasFW = null; S.partidasBJ = null; S.rk = { game:"buraco", fsort:"pts", bsort:"net", view:"jog", sort:"pts", bots:true, dsort:"v", mes:"all" };
 var RK_PTS = { v:10, q:2, bat:1 };
 function nomeJogador(uid){
   if(isBot(uid)) return botPlayer(uid).nome;
@@ -562,7 +569,7 @@ function computeStats(list){
   return { jog:jog, dup:dup };
 }
 function rkHead(id, label, cur){ return '<th class="'+(cur===id?"on":"")+'" data-action="rk-sort" data-id="'+id+'">'+label+(cur===id?" ▾":"")+'</th>'; }
-function rkGameSeg(){ var g = S.rk.game; return '<div class="seg" style="margin-bottom:10px"><button class="'+(g==="buraco"?"on":"")+'" data-action="rk-game" data-id="buraco">🃏 Buraco</button><button class="'+(g==="faroeste"?"on":"")+'" data-action="rk-game" data-id="faroeste">🤠 Faroeste</button></div>'; }
+function rkGameSeg(){ var g = S.rk.game; return '<div class="seg" style="margin-bottom:10px"><button class="'+(g==="buraco"?"on":"")+'" data-action="rk-game" data-id="buraco">🃏 Buraco</button><button class="'+(g==="faroeste"?"on":"")+'" data-action="rk-game" data-id="faroeste">🤠 Faroeste</button><button class="'+(g==="blackjack"?"on":"")+'" data-action="rk-game" data-id="blackjack">🂡 Blackjack</button></div>'; }
 var FW_PAPEL = { xerife:"Xerife", ajudante:"Ajudante", bandido:"Bandido", renegado:"Renegado" };
 function viewRankingFW(){
   var h = ['<div class="panel rkp"><div class="eyebrow" style="padding-left:6px">Ranking</div><h2 class="ph" style="padding-left:6px">Quem manda no Faroeste</h2>', rkGameSeg()];
@@ -595,7 +602,37 @@ function viewRankingFW(){
   h.push('</table></div><p class="muted" style="margin-top:10px;font-size:12px">Pontuação = 3 por vitória + 1 por abate. Papéis: vitórias/partidas naquele papel. Toque no título da coluna para ordenar.</p></div>');
   return h.join("");
 }
+function viewRankingBJ(){
+  var h = ['<div class="panel rkp"><div class="eyebrow" style="padding-left:6px">Ranking</div><h2 class="ph" style="padding-left:6px">Quem quebra a banca</h2>', rkGameSeg()];
+  if(S.partidasBJ === null){ h.push('<p class="muted">Carregando…</p></div>'); return h.join(""); }
+  var rk = S.rk, meses = {}; S.partidasBJ.forEach(function(m){ meses[mesKey(dataPartida(m))] = 1; });
+  var mesList = Object.keys(meses).sort().reverse(); if(rk.mes !== "all" && !meses[rk.mes]) rk.mes = "all";
+  var list = rk.mes === "all" ? S.partidasBJ : S.partidasBJ.filter(function(m){ return mesKey(dataPartida(m)) === rk.mes; });
+  h.push('<label class="f">Período<select class="in" data-action="rk-mes"><option value="all"'+(rk.mes==="all"?" selected":"")+'>Geral (histórico completo)</option>'+mesList.map(function(k){ return '<option value="'+k+'"'+(rk.mes===k?" selected":"")+'>'+esc(mesLabel(k))+'</option>'; }).join("")+'</select></label>');
+  if(!list.length){ h.push('<p class="muted" style="margin-top:14px">Nenhuma mesa de Blackjack encerrada'+(rk.mes==="all"?" ainda":" neste período")+'. O ranking conta quando a mesa é encerrada.</p></div>'); return h.join(""); }
+  var T = {};
+  list.forEach(function(m){
+    (m.jogadores||[]).forEach(function(uid, i){
+      if(!uid) return;
+      var t = T[uid] = T[uid] || { id:uid, p:0, net:0, rod:0, w:0, l:0, bj:0, mx:0, best:-1e9 };
+      var net = (m.saldos||[])[i]||0, rod = (m.jogadasRodadas||[])[i]||0;
+      t.p++; t.net += net; t.rod += rod; t.w += (m.maosGanhas||[])[i]||0; t.l += (m.maosPerdidas||[])[i]||0; t.bj += (m.blackjacks||[])[i]||0;
+      t.mx = Math.max(t.mx, (m.maiores||[])[i]||0); t.best = Math.max(t.best, net);
+    });
+  });
+  var rows = Object.keys(T).map(function(k){ var t = T[k]; t.pct = (t.w+t.l) ? Math.round(t.w*100/(t.w+t.l)) : 0; return t; }).filter(function(t){ return rk.bots || !isBot(t.id); });
+  var key = rk.bsort; rows.sort(function(a,b){ return (b[key]-a[key]) || (b.net-a.net) || (a.p-b.p); });
+  h.push('<label class="chk"><input type="checkbox" '+(rk.bots?"checked":"")+' data-action="rk-bots"> Mostrar bots</label>');
+  var sg = function(n){ return (n>0?"+":n<0?"−":"")+Math.abs(n); };
+  h.push('<div class="rkwrap"><table class="rk"><tr><th>#</th><th class="l">Jogador</th>'+['net:Saldo','p:Mesas','rod:Rod.','pct:%','bj:BJ','mx:Maior'].map(function(x){ var a = x.split(":"); return '<th class="'+(key===a[0]?"on":"")+'" data-action="rk-bsort" data-id="'+a[0]+'">'+a[1]+(key===a[0]?" ▾":"")+'</th>'; }).join("")+'</tr>');
+  rows.forEach(function(t, i){
+    h.push('<tr class="'+(S.user && t.id===S.user.uid?"me":"")+'"><td>'+(i===0?"🥇":i===1?"🥈":i===2?"🥉":(i+1))+'</td><td class="l"><span class="rkn">'+avatarRk(t.id)+'<span>'+esc(nomeJogador(t.id))+'</span></span></td><td><b>'+sg(t.net)+'</b></td><td>'+t.p+'</td><td>'+t.rod+'</td><td>'+t.pct+'%</td><td>'+t.bj+'</td><td>'+sg(t.mx)+'</td></tr>');
+  });
+  h.push('</table></div><p class="muted" style="margin-top:10px;font-size:12px">Saldo = soma do resultado das mesas (fichas finais − iniciais − recompras). Rod. = rodadas jogadas · % = mãos ganhas · BJ = Blackjacks · Maior = maior ganho em uma rodada. Toque no título da coluna para ordenar.</p></div>');
+  return h.join("");
+}
 function viewRanking(){
+  if(S.rk.game === "blackjack") return viewRankingBJ();
   if(S.rk.game === "faroeste") return viewRankingFW();
   var h = ['<div class="panel rkp"><div class="eyebrow" style="padding-left:6px">Ranking</div><h2 class="ph" style="padding-left:6px">Quem manda no buraco</h2>', rkGameSeg()];
   if(S.partidas === null){ h.push('<p class="muted" style="margin-top:10px">Carregando…</p></div>'); return h.join(""); }
@@ -739,7 +776,7 @@ function viewApp(){
   h.push(tabBtn("inicio","Início")); h.push(tabBtn("ranking","Ranking")); h.push(tabBtn("regras","Regras")); h.push(tabBtn("perfil","Meu cadastro"));
   if(isMaster()) h.push(tabBtn("admin","Administração", pend));
   h.push('</div>');
-  if(S.tab === "regras") h.push('<div class="card">'+regrasHtml()+(window.FaroesteUI?'<div style="margin-top:18px">'+FaroesteUI.rulesHtml()+'</div>':"")+'</div>'); else if(S.tab === "ranking") h.push(viewRanking());
+  if(S.tab === "regras") h.push('<div class="card">'+regrasHtml()+(window.FaroesteUI?'<div style="margin-top:18px">'+FaroesteUI.rulesHtml()+'</div>':"")+(window.BlackjackUI?'<div style="margin-top:18px">'+BlackjackUI.rulesHtml()+'</div>':"")+'</div>'); else if(S.tab === "ranking") h.push(viewRanking());
   else if(S.tab === "perfil") h.push(viewPerfil());
   else if(S.tab === "admin" && isMaster()) h.push(viewAdmin());
   else h.push(viewInicio());
@@ -763,7 +800,8 @@ function tabBtn(id, label, dot){ return '<button class="tab'+(S.tab===id?" on":"
 
 var GAMES = [
   { id:"buraco", ic:"🃏", nome:"Buraco", desc:"Buraco Aberto · 4 jogadores, 2 duplas", ok:true },
-  { id:"faroeste", ic:"🤠", nome:"Faroeste", desc:"Xerife, ajudantes, bandidos e renegado · 4 a 7 jogadores", ok:true }
+  { id:"faroeste", ic:"🤠", nome:"Faroeste", desc:"Xerife, ajudantes, bandidos e renegado · 4 a 7 jogadores", ok:true },
+  { id:"blackjack", ic:"🂡", nome:"Blackjack", desc:"Contra a banca · até 6 jogadores · fichas, dobrar, separar e Par Perfeito", ok:true }
 ];
 function gamesPanel(){
   return '<div class="panel"><div class="eyebrow">Jogos</div><h2 class="ph">Central de jogos da família</h2>'+GAMES.map(function(g){
@@ -1058,7 +1096,7 @@ function deleteMesa(){
   var id = S.mesaId; if(!confirm("Excluir esta mesa?")) return;
   estadoRef(id).delete().catch(function(){}).then(function(){ return mesasCol().doc(id).delete(); }).then(function(){ closeMesa(); }).catch(toastErr);
 }
-function closeMesa(){ if(window.FaroesteUI) FaroesteUI.stop(); stopGame(); S.mesaId = null; S.lastMesa = null; S._forceRender = true; render(); }
+function closeMesa(){ if(window.FaroesteUI) FaroesteUI.stop(); if(window.BlackjackUI) BlackjackUI.stop(); stopGame(); S.mesaId = null; S.lastMesa = null; S._forceRender = true; render(); }
 
 /* ── jogadas ── */
 
@@ -1073,14 +1111,15 @@ function mesasPanel(){
   var h = ['<div class="panel"><div class="eyebrow">Mesas</div><h2 class="ph">Vamos jogar?</h2>'];
   h.push('<label class="f">Nome da mesa (opcional)<input class="in" id="mesa_nome" maxlength="30" placeholder="ex.: Mesa da vó"></label>');
   h.push('<div style="display:flex;gap:8px"><button class="btn gold" data-action="mesa-criar">🃏 Mesa de Buraco</button><button class="btn gold" data-action="fw-create">🤠 Mesa de Faroeste</button></div>');
+  h.push('<div style="display:flex;gap:8px;margin-top:8px"><button class="btn gold" data-action="bj-create">🂡 Mesa de Blackjack</button></div>');
   var list = S.mesas || [], any = false;
   list.forEach(function(m){
     var mine = mySeat(m) >= 0; if(m.status === "jogando" && !mine && false) return;
-    var avs = ""; for(var i=0;i<m.seats.length;i++){ if(m.jogo==="faroeste" && !m.seats[i]) continue; var p = m.seats[i] ? playerByUid(m.seats[i]) : null; avs += p ? avatarMini(p) : '<div class="av empty">·</div>'; }
+    var avs = ""; for(var i=0;i<m.seats.length;i++){ if((m.jogo==="faroeste" || m.jogo==="blackjack") && !m.seats[i]) continue; var p = m.seats[i] ? playerByUid(m.seats[i]) : null; avs += p ? avatarMini(p) : '<div class="av empty">·</div>'; }
     var n = m.seats.filter(function(x){ return x; }).length;
     if(!any){ h.push('<div style="margin-top:16px" class="eyebrow">Mesas abertas</div>'); any = true; }
-    h.push('<div class="mesaitem"><div class="avs">'+avs+'</div><div class="grow" style="flex:1;min-width:0"><div style="font-weight:700">'+esc(m.nome||"Mesa")+'</div><div class="muted">'+(m.status==="jogando"?(m.pausada?"⏸ Pausada — retome quando quiser":"Em andamento"):n+"/"+(m.jogo==="faroeste"?"7":"4")+" jogadores")+(m.jogo==="faroeste"?" · Faroeste":"")+'</div></div>'+
-      '<button class="btn small '+(mine&&m.status==="jogando"?"gold":"ghost")+'" data-action="mesa-abrir" data-id="'+m.id+'">'+(mine&&m.status==="jogando"?(m.pausada?"Retomar":"Voltar ao jogo"):(m.status==="jogando"?"Ver":"Entrar"))+'</button></div>');
+    h.push('<div class="mesaitem"><div class="avs">'+avs+'</div><div class="grow" style="flex:1;min-width:0"><div style="font-weight:700">'+esc(m.nome||"Mesa")+'</div><div class="muted">'+(m.status==="jogando"?(m.pausada?"⏸ Pausada — retome quando quiser":"Em andamento"):n+"/"+(m.jogo==="faroeste"?"7":m.jogo==="blackjack"?"6":"4")+" jogadores")+(m.jogo==="faroeste"?" · Faroeste":m.jogo==="blackjack"?" · Blackjack":"")+'</div></div>'+
+      '<button class="btn small '+(mine&&m.status==="jogando"?"gold":"ghost")+'" data-action="mesa-abrir" data-id="'+m.id+'">'+(mine&&m.status==="jogando"?(m.pausada?"Retomar":"Voltar ao jogo"):(m.status==="jogando"?(m.jogo==="blackjack"?"Entrar":"Ver"):"Entrar"))+'</button></div>');
   });
   if(!any) h.push('<p class="muted" style="margin-top:14px">Nenhuma mesa aberta. Crie a primeira!</p>');
   h.push('</div>');
@@ -1094,9 +1133,10 @@ function viewMesa(){
   var m = mesaAtual();
   if(m) S.lastMesa = m;
   if(!m && S.pendingMesa === S.mesaId && Date.now() - S.pendingAt < 6000) return '<div class="wrap">'+viewLoading()+'</div>';
-  if(!m && !(S.game && gameFor === S.mesaId) && !(S.fw && S.fw.game && S.lastMesa && S.lastMesa.id === S.mesaId)){ S.mesaId = null; stopGame(); return null; }
+  if(!m && !(S.game && gameFor === S.mesaId) && !(S.fw && S.fw.game && S.lastMesa && S.lastMesa.id === S.mesaId) && !(S.bj && S.bj.game && S.lastMesa && S.lastMesa.id === S.mesaId)){ S.mesaId = null; stopGame(); return null; }
   m = m || S.lastMesa;
   if(m.jogo === "faroeste" && window.FaroesteUI) return FaroesteUI.view(m);
+  if(m.jogo === "blackjack" && window.BlackjackUI) return BlackjackUI.view(m);
   ensureGameListener();
   if(m.status === "aguardando") return lobbyHtml(m);
   var me = mySeat(m);
@@ -1656,9 +1696,10 @@ document.addEventListener("change", function(ev){
 document.addEventListener("click", function(ev){
   if(S.noClickUntil && Date.now() < S.noClickUntil && ev.target.closest && ev.target.closest(".hrow")){ ev.stopPropagation(); return; }
   var el = ev.target.closest("[data-action]"); if(!el) return;
-  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || /^fw-.*-close$/.test(da0) || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist" || da0 === "close-rules") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
+  var da0 = el.getAttribute("data-action"); if((da0 === "close-modal" || /^(fw|bj)-.*-close$/.test(da0) || da0 === "close-menu" || da0 === "close-zoom" || da0 === "close-hist" || da0 === "close-rules") && ev.target.closest("[data-stop]") && !ev.target.closest("button")) return;
   var act = el.getAttribute("data-action"), id = el.getAttribute("data-id");
   if(act.indexOf("fw-") === 0){ if(window.FaroesteUI) FaroesteUI.handle(act, id); return; }
+  if(act.indexOf("bj-") === 0){ if(window.BlackjackUI) BlackjackUI.handle(act, id); return; }
   switch(act){
     case "reload": location.reload(); break;
     case "mesa-criar": criarMesa(); break;
@@ -1699,6 +1740,7 @@ document.addEventListener("click", function(ev){
     case "pick-cancel": S.picker = null; S._forceRender = true; render(); break;
     case "g-next": jogar("START_NEXT_ROUND"); break;
     case "rk-game": S.rk.game = id; S._forceRender = true; render(); break;
+    case "rk-bsort": S.rk.bsort = id; S._forceRender = true; render(); break;
     case "rk-fsort": S.rk.fsort = id; S._forceRender = true; render(); break;
     case "rk-view": S.rk.view = id; S._forceRender = true; render(); break;
     case "rk-sort": S.rk.sort = id; S._forceRender = true; render(); break;
