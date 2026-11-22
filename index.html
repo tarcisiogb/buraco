@@ -36,6 +36,7 @@ button,input,select{font-family:inherit;font-size:16px}
 :focus-visible{outline:2.5px solid var(--gold);outline-offset:2px;border-radius:8px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 img{max-width:100%}
+body:not(.ingame)::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--paper);z-index:60;pointer-events:none}
 .wrap{max-width:920px;margin:0 auto;padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 80px max(16px,env(safe-area-inset-left))}
 .wrap.auth{max-width:440px;padding-top:28px}
 .brand{text-align:center;margin:8px 0 22px}
@@ -322,7 +323,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="blackjack-ui.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-22b";
+var BUILD = "2026-11-22c";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",
