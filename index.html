@@ -36,8 +36,9 @@ button,input,select{font-family:inherit;font-size:16px}
 :focus-visible{outline:2.5px solid var(--gold);outline-offset:2px;border-radius:8px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 img{max-width:100%}
-body:not(.ingame)::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--paper);z-index:60;pointer-events:none}
-.wrap{max-width:920px;margin:0 auto;padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 80px max(16px,env(safe-area-inset-left))}
+body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--paper);z-index:60;pointer-events:none}
+body:has(.bjscreen)::before,body:has(.fwscreen)::before{display:none}
+.wrap{max-width:920px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 8px) max(16px,env(safe-area-inset-right)) 80px max(16px,env(safe-area-inset-left))}
 .wrap.auth{max-width:440px;padding-top:28px}
 .brand{text-align:center;margin:8px 0 22px}
 .brand .logo{width:72px;height:72px;border-radius:20px;background:var(--felt);color:#f4efe0;display:inline-grid;place-items:center;font-size:44px;box-shadow:var(--shadow);border:2px solid var(--gold)}
@@ -120,7 +121,7 @@ label.f{display:block;margin-top:14px;font-size:13px;font-weight:600;color:var(-
 .avs{display:flex}.avs .av{width:30px;height:30px;font-size:11px;margin-left:-8px;cursor:default;border-width:2px}.avs .av:first-child{margin-left:0}
 .avs .empty{background:#e9ece8;color:#9aa59e;border-color:#fff}
 body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
-.gscreen{height:100vh;height:100dvh;display:flex;flex-direction:column;padding:max(10px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(22px,calc(env(safe-area-inset-bottom) + 10px)) max(14px,env(safe-area-inset-left));max-width:560px;margin:0 auto;gap:6px;overflow:hidden;position:relative}
+.gscreen{height:100vh;height:100dvh;display:flex;flex-direction:column;padding:calc(max(10px,env(safe-area-inset-top)) + 12px) max(14px,env(safe-area-inset-right)) max(22px,calc(env(safe-area-inset-bottom) + 10px)) max(14px,env(safe-area-inset-left));max-width:560px;margin:0 auto;gap:6px;overflow:hidden;position:relative}
 .gtop{display:flex;align-items:center;gap:6px;flex:none;padding:0}
 .gtop .score{flex:1;justify-content:center}
 .iconbtn{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:16px;cursor:pointer;flex:none;line-height:1}
@@ -323,7 +324,7 @@ body.ingame{overflow:hidden;position:fixed;inset:0;width:100%}
 <script src="blackjack-ui.js"></script>
 <script>
 "use strict";
-var BUILD = "2026-11-22c";
+var BUILD = "2026-11-22d";
 
 var firebaseConfig = {
   apiKey: "AIzaSyB0UPpjvgSTIlT4csgUTBoi_ZK5pWG8aEU",

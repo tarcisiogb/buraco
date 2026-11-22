@@ -28,8 +28,8 @@
     '.bjprompt{background:#e6c15a;color:#2b1a10;border-radius:12px;padding:6px 10px;font-weight:700;font-size:13px;flex:none;text-align:center}',
     '.bjbar{display:flex;gap:6px;flex:none;flex-wrap:wrap}.bjbar .btn{margin:0;flex:1;min-width:84px;padding:10px 6px;font-size:14px}',
     '.bjchips{display:flex;gap:8px;justify-content:center;flex:none}',
-    '.chip{width:52px;height:52px;border-radius:50%;border:4px dashed #ffffffcc;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;box-shadow:0 3px 6px #0007;cursor:pointer;user-select:none}',
-    '.chip.c10{background:#2f6fb5}.chip.c50{background:#c0392b}.chip.c100{background:#222}.chip.c500{background:#7d3c98}.chip.off{opacity:.35}',
+    '.bjchip{width:52px;height:52px;border-radius:50%;border:4px dashed #ffffffcc;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;box-shadow:0 3px 6px #0007;cursor:pointer;user-select:none}',
+    '.bjchip.c10{background:#2f6fb5}.bjchip.c50{background:#c0392b}.bjchip.c100{background:#222}.bjchip.c500{background:#7d3c98}.bjchip.off{opacity:.35}',
     '.bjmodal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}.bjmodal .box{background:#f3f8f2;color:#10261a;border-radius:16px;padding:14px;max-width:440px;width:100%;max-height:86vh;overflow:auto}',
     '.bjmodal h3{margin:0 0 8px}.bjrank{width:100%;border-collapse:collapse;font-size:13px}.bjrank td,.bjrank th{padding:5px 3px;border-bottom:1px solid #00000018;text-align:right}.bjrank td:first-child,.bjrank th:first-child{text-align:left}',
     '.bjlob .row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}'
@@ -240,7 +240,7 @@
         bar = '<button class="btn ghost" data-action="bj-rebet">Mudar aposta</button>';
       } else {
         var max = Math.min(BJ.RULES.maxBet, p.chips), avail = p.chips - f.side;
-        var chip = function (v) { var off = f.bet + v > Math.min(BJ.RULES.maxBet, p.chips - f.side); return '<div class="chip c' + v + (off ? ' off' : '') + '" data-action="bj-chip" data-id="' + v + '">' + v + '</div>'; };
+        var chip = function (v) { var off = f.bet + v > Math.min(BJ.RULES.maxBet, p.chips - f.side); return '<div class="bjchip c' + v + (off ? ' off' : '') + '" data-action="bj-chip" data-id="' + v + '">' + v + '</div>'; };
         prompt = 'Faça sua aposta (' + BJ.RULES.minBet + ' a ' + BJ.RULES.maxBet + '). Saldo: ' + p.chips;
         var chipsRow = '<div class="bjchips">' + chip(10) + chip(50) + chip(100) + chip(500) + '</div>';
         var sideTxt = f.side ? 'Par Perfeito: ' + f.side : 'Par Perfeito: não';
