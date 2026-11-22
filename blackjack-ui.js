@@ -61,7 +61,8 @@
     var uid = S.user.uid;
     seatTx('sit', function (c, real) {
       if (c.indexOf(uid) >= 0) return false;
-      var i = c.indexOf(null); if (i < 0) { if (real) throw { message: 'A mesa está cheia.' }; return false; }
+      var i = c.indexOf(null); if (i < 0) i = c.findIndex(isBot); // mesa cheia: entra no lugar de um bot
+      if (i < 0) { if (real) throw { message: 'A mesa está cheia de pessoas.' }; return false; }
       c[i] = uid;
     });
   }
@@ -118,7 +119,7 @@
       h.push('<div class="row">' + (p ? avatarMini(p) : '<div class="av empty">·</div>') + '<div class="grow"><div class="t">' + (p ? esc(p.apelido || primeiro(p.nome)) : 'Vaga ' + (i + 1)) + '</div></div>' + (p && p.bot && adm ? '<button class="btn ghost mini" data-action="bj-rmbot" data-id="' + i + '">Tirar</button>' : '') + '</div>');
     });
     h.push('<div class="muted" style="margin:10px 0;text-align:center">' + n + '/' + MAXP + ' lugares</div>');
-    if (me < 0) h.push('<button class="btn gold" data-action="bj-sit"' + (n >= MAXP ? ' disabled' : '') + '>Sentar na mesa</button>');
+    if (me < 0) h.push('<button class="btn gold" data-action="bj-sit"' + (n >= MAXP && !m.seats.some(isBot) ? ' disabled' : '') + '>Sentar na mesa</button>');
     else h.push('<button class="btn ghost" data-action="bj-getup">Levantar</button>');
     if (adm) {
       if (n < MAXP) h.push('<div class="randrow"><span>🤖 Colocar bots:</span>' + [1, 2, 3, 4, 5].map(function (k) { return '<button class="btn ghost mini" data-action="bj-addbots" data-id="' + k + '"' + (k <= MAXP - n ? '' : ' disabled') + '>' + k + '</button>'; }).join('') + '</div>');
