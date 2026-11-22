@@ -10,7 +10,8 @@
   'use strict';
 
   const RULES = { decks: 6, start: 1000, minBet: 10, maxBet: 500, step: 10, maxSide: 100, maxHands: 4, reshuffleBelow: 78, maxPlayers: 6, minPlayers: 1,
-    pairs: { misto: 6, colorido: 12, perfeito: 25 } };
+    pairs: { misto: 6, colorido: 12, perfeito: 25 },
+    idleMs: { BETTING: 40000, INSURANCE: 30000, PLAYING: 40000 } }; // tempo parado até o jogador ficar "ausente"
   const SUITS = ['S', 'H', 'D', 'C'];
   const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   const RED = { H: 1, D: 1 };
@@ -39,7 +40,7 @@
 
   function createGame(opts) {
     const players = opts.players.map((p, i) => ({ seat: i, id: p.id, name: p.name, chips: RULES.start, rebuys: 0, bet: 0, side: 0, ready: false, insured: 0, insDecided: false,
-      hands: [], sideResult: null, sidePay: 0, chipsStart: RULES.start, base: RULES.start, roundNet: 0, biggest: 0, rounds: 0, handsWon: 0, handsLost: 0, handsPush: 0, blackjacks: 0, peak: RULES.start }));
+      hands: [], sideResult: null, sidePay: 0, chipsStart: RULES.start, base: RULES.start, roundNet: 0, biggest: 0, rounds: 0, handsWon: 0, handsLost: 0, handsPush: 0, blackjacks: 0, peak: RULES.start, absent: false }));
     const st = { v: 1, rs: (opts.seed >>> 0) || 1, round: 1, phase: 'BETTING', players, dealer: { cards: [], reveal: false }, shoe: [], turn: null, log: [], reshuffled: true, winner: null };
     st.shoe = buildShoe(st);
     return st;
@@ -158,7 +159,19 @@
   function applyAction(state, a) {
     const s = clone(state), me = s.players[a.player];
     if (!me && a.type !== 'END_GAME') return fail('Jogador inválido.');
-    const t = a.type;
+    const t = a.type, prevAt = s.lastAt;
+    if (t !== 'ABSENT' && typeof a.at === 'number') s.lastAt = a.at;
+    if (me && me.absent && !a.auto && t !== 'ABSENT') { me.absent = false; ev(s, { type: 'BACK', seat: me.seat }); } // voltou a jogar
+    if (t === 'RETURN') return { ok: true, state: s };
+    if (t === 'ABSENT') { // qualquer cliente pode marcar quem ficou parado além do limite
+      const lim = RULES.idleMs[s.phase];
+      if (!lim || typeof a.at !== 'number' || typeof prevAt !== 'number') return fail('Sem controle de tempo.');
+      if (a.at - prevAt < lim) return fail('Ainda dentro do tempo.');
+      if (me.absent) return fail('Já está ausente.');
+      if (pending(s).indexOf(me.seat) < 0) return fail('Esse jogador não está devendo jogada.');
+      me.absent = true; ev(s, { type: 'ABSENT', seat: me.seat });
+      return { ok: true, state: s };
+    }
 
     if (t === 'BET') {
       if (s.phase !== 'BETTING') return fail('Não é hora de apostar.');
@@ -201,7 +214,7 @@
 
     if (t === 'TAKEOVER') { // um humano assume o lugar de um bot (a qualquer momento); o saldo conta a partir daqui
       if (s.phase === 'ENDED') return fail('A mesa já acabou.');
-      me.id = a.id; me.name = a.name;
+      me.id = a.id; me.name = a.name; me.absent = false;
       me.base = (s.phase === 'PLAYING' || s.phase === 'INSURANCE') ? me.chipsStart : me.chips;
       me.rebuys = 0; me.biggest = 0; me.rounds = 0; me.handsWon = 0; me.handsLost = 0; me.handsPush = 0; me.blackjacks = 0; me.peak = me.chips;
       ev(s, { type: 'TAKEOVER', seat: me.seat });

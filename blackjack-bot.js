@@ -55,7 +55,7 @@
   function chooseAction(s, me) {
     if (!s || s.phase === 'ENDED') return null;
     let a = null;
-    if (s.phase === 'BETTING') { if (!s.players[me].ready) a = betAction(s, me); }
+    if (s.phase === 'BETTING') { if (!s.players[me].ready) a = s.players[me].absent ? { type: 'BET', player: me, bet: 0, side: 0 } : betAction(s, me); }
     else if (s.phase === 'INSURANCE') { const p = s.players[me]; if (p.bet > 0 && !p.insDecided) a = { type: 'INSURE', player: me, take: false }; }
     else if (s.phase === 'PLAYING' && s.turn && s.turn.seat === me) a = playAction(s, me);
     if (a && trial(s, a)) return a;

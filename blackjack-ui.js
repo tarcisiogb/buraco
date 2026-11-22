@@ -15,7 +15,7 @@
     '.bjdealer .lb{font-size:11px;opacity:.85;margin-bottom:4px;letter-spacing:.04em;text-transform:uppercase}',
     '.bjcards{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;min-height:20px}',
     '.bjsc{display:inline-block;background:#eaf5ec;color:#0c2b1c;border-radius:10px;padding:0 8px;font-weight:800;font-size:12px;margin-top:4px}',
-    '.bjseats{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start}',
+    '.bjseats{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start}.bjseat:not(.me) .bjnote{font-size:11px}',
     '.bjseat{background:#00000030;border:2px solid #ffffff22;border-radius:12px;padding:6px;position:relative}',
     '.bjseat.me{grid-column:1/-1;border-color:#9ad9b0}.bjseat.turn{border-color:#e6c15a;box-shadow:0 0 0 2px #e6c15a66}.bjseat.out{opacity:.55}',
     '.bjseat .hd{display:flex;justify-content:space-between;gap:6px;font-size:12px;margin-bottom:4px}.bjseat .nm{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
@@ -84,7 +84,7 @@
       if (!seats.some(function (x) { return !isBot(x); })) throw { message: 'Precisa de pelo menos um humano.' };
       if (seats.length < MINP) throw { message: 'Sente pelo menos ' + MINP + ' jogador.' };
       var players = seats.map(function (u) { return { id: u, name: nameOf(u) }; });
-      var st = BJ.createGame({ players: players, seed: Math.floor(Math.random() * 4294967296) });
+      var st = BJ.createGame({ players: players, seed: Math.floor(Math.random() * 4294967296) }); st.lastAt = Date.now();
       tx.set(estadoRef(S.mesaId), { json: JSON.stringify(st), v: 1 });
       tx.update(ref, { status: 'jogando', seats: seats, jogadores: seats, iniciadaEm: firebase.firestore.FieldValue.serverTimestamp() });
     }); }).catch(toastErr);
@@ -144,6 +144,15 @@
   function resync() { if (!S.mesaId) return Promise.resolve(); return estadoRef(S.mesaId).get({ source: 'server' }).then(accept).catch(function () {}); }
   setInterval(function () { var f = S.bj; if (f && f.game && S.mesaId && !f.sending && !document.hidden && gameFor === S.mesaId) resync(); }, 5000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden && S.bj && S.bj.game && gameFor === S.mesaId) resync(); });
+  // jogador parado além do limite vira "ausente" e a mesa joga por ele
+  setInterval(function () {
+    var f = S.bj, g = f && f.game, m = S.lastMesa;
+    if (!g || !m || !S.user || f.sending || document.hidden || gameFor !== S.mesaId || mySeat(m) < 0) return;
+    var lim = BJ.RULES.idleMs[g.phase]; if (!lim || typeof g.lastAt !== 'number' || Date.now() - g.lastAt < lim) return;
+    var pend = BJ.pending(g), hit = null;
+    pend.forEach(function (i) { if (!hit && !g.players[i].absent && m.seats[i] && !isBot(m.seats[i])) hit = i; });
+    if (hit !== null) act({ type: 'ABSENT', player: hit }, true);
+  }, 2000);
   function stop() {
     if (unsub) { unsub(); unsub = null; } gameFor = null;
     if (S.bj) { S.bj.game = null; S.bj.v = 0; S.bj.sending = false; S.bj.bet = 0; S.bj.side = 0; S.bj.round = 0; S.bj.rules = false; S.bj.nosum = false; S.bj.botSeen = null; }
@@ -154,8 +163,7 @@
     if (g.round !== f.round) {
       f.round = g.round; f.editing = false;
       var p = me >= 0 ? g.players[me] : null, last = prev && prev.players[me] ? prev.players[me] : null;
-      f.bet = last && last.bet ? last.bet : (p ? Math.min(BJ.RULES.minBet * 2, p.chips) : 0); f.side = last ? last.side : 0;
-      if (p) { var cap = Math.min(BJ.RULES.maxBet, p.chips); if (f.bet > cap) f.bet = Math.floor(cap / 10) * 10; if (f.bet + f.side > p.chips) f.side = 0; }
+      f.bet = 0; f.side = 0; // cada rodada começa com as fichas zeradas: é preciso escolher de novo
     }
     if (me >= 0 && prev && typeof sfx === 'function') {
       var now = BJ.pending(g).indexOf(me) >= 0 && g.phase === 'PLAYING', was = BJ.pending(prev).indexOf(me) >= 0 && prev.phase === 'PLAYING';
@@ -166,7 +174,7 @@
   function act(a, quiet) {
     var f = ST();
     if (f.sending) { if (!quiet) toast('Enviando a jogada anterior…'); return; }
-    var g = f.game, r = BJ.applyAction(g, a);
+    var g = f.game; a.at = Date.now(); var r = BJ.applyAction(g, a);
     if (!r.ok) { if (!quiet) toast(r.error); return; }
     f.game = r.state; f.v = (f.v || 0) + 1; f.sending = true; S._forceRender = true; render();
     var ref = estadoRef(S.mesaId);
@@ -210,15 +218,16 @@
     return '<div class="bjhand' + (active ? ' act' : '') + '">' + cardsHtml(h.cards, cw) + '<div class="meta">' + meta + '</div></div>';
   }
   function seatHtml(g, p, me, cwBig) {
-    var isMe = p.seat === me, cw = isMe ? cwBig : 30;
+    var isMe = p.seat === me, cw = isMe ? cwBig : 26;
     var turn = g.phase === 'PLAYING' && g.turn && g.turn.seat === p.seat;
     var out = p.hands.length === 0 && g.phase !== 'BETTING';
-    var head = '<div class="hd"><span class="nm">' + esc(p.name) + (isMe ? ' (você)' : '') + (turn ? ' ▶' : '') + '</span><span class="fch">🪙 ' + p.chips + '</span></div>';
+    var head = '<div class="hd"><span class="nm">' + esc(p.name) + (isMe ? ' (você)' : '') + (p.absent ? ' 💤' : '') + (turn ? ' ▶' : '') + '</span><span class="fch">🪙 ' + p.chips + '</span></div>';
     var body = '';
     if (p.hands.length) body = '<div class="bjhands">' + p.hands.map(function (h, i) { return handHtml(g, p, h, i, cw, turn && g.turn.hand === i); }).join('') + '</div>';
     else if (g.phase === 'BETTING') body = '<div class="bjnote">' + (p.ready ? (p.bet > 0 ? '✅ Apostou ' + p.bet : '⏭ Passou a rodada') : '… escolhendo a aposta') + '</div>';
     else body = '<div class="bjnote">Fora desta rodada</div>';
     var notes = '';
+    if (p.absent) notes += '<div class="bjnote">💤 Ausente — a mesa joga por ele</div>';
     if (p.sideResult) notes += '<div class="bjnote">🎯 Par Perfeito: ' + (p.sideResult === 'perdeu' ? 'não saiu (−' + p.side + ')' : p.sideResult + ' +' + (p.sidePay - p.side)) + '</div>';
     if (p.insured) notes += '<div class="bjnote">🛡 Seguro ' + p.insured + (g.phase === 'ROUND_OVER' ? (g.dealer.cards.length === 2 && BJ.isBJ(g.dealer.cards) ? ' (pagou 2:1)' : ' (perdido)') : '') + '</div>';
     if (g.phase === 'ROUND_OVER' && p.bet > 0) notes += '<div class="bjnote"><b>Rodada: ' + sgn(p.roundNet) + '</b></div>';
@@ -231,6 +240,7 @@
   }
   function barHtml(g, m, me) {
     var f = ST(), p = g.players[me], bar = '', prompt = '', o = BJ.options(g, me);
+    if (p.absent && g.phase !== 'ENDED') return { prompt: '💤 Você ficou ausente: a mesa está jogando por você.', bar: '<button class="btn gold" data-action="bj-back">Voltei!</button>' };
     var humans = m.seats.some(function (u) { return u && !isBot(u); });
     if (g.phase === 'ENDED') return { prompt: 'Mesa encerrada', bar: '<button class="btn gold" data-action="mesa-back">Voltar às mesas</button>' };
     if (g.phase === 'BETTING') {
@@ -296,7 +306,7 @@
     var f = ST(), g = f.game, p = g.players[me];
     var head = '<div class="bjtop"><button class="iconbtn" data-action="mesa-back" aria-label="Voltar">‹</button><div class="st">Blackjack · rodada ' + g.round + '<br><span style="font-weight:400;font-size:12px">🪙 ' + p.chips + ' fichas · ' + BJ.RULES.decks + ' baralhos</span></div>' +
       '<button class="iconbtn" data-action="bj-table" aria-label="Placar">🏆</button><button class="iconbtn" data-action="bj-rules" aria-label="Regras">?</button></div>';
-    var seats = seatHtml(g, p, me, 42) + g.players.filter(function (q) { return q.seat !== me; }).map(function (q) { return seatHtml(g, q, me, 42); }).join('');
+    var seats = g.players.filter(function (q) { return q.seat !== me; }).map(function (q) { return seatHtml(g, q, me, 42); }).join('') + seatHtml(g, p, me, 38);
     var b = barHtml(g, m, me);
     return '<div class="bjscreen">' + head + dealerHtml(g) + '<div class="bjseats">' + seats + '</div><div class="bjprompt">' + b.prompt + '</div><div class="bjbar">' + b.bar + '</div></div>' + modals(g, me) + (S.toast ? '<div class="toast">' + esc(S.toast) + '</div>' : '');
   }
@@ -323,6 +333,7 @@
       D('Jogadas', '<p><b>Pedir</b>: mais uma carta. <b>Parar</b>: fica com o que tem. <b>Dobrar</b>: dobra a aposta, recebe uma só carta e para (vale com 2 cartas, inclusive depois de separar). <b>Separar</b>: duas cartas iguais (mesmo número ou letra) viram duas mãos com uma aposta igual em cada; até 4 mãos. Ases separados recebem só uma carta cada e não separam de novo. <b>Desistir</b>: só como primeira jogada; devolve metade da aposta.</p>') +
       D('Seguro', '<p>Se a banca mostra um <b>Ás</b>, você pode fazer um seguro de até metade da aposta. Se a banca tiver Blackjack, o seguro paga 2:1 (empatando a rodada); se não, perde o seguro e o jogo continua. Com 10 ou Ás aparente, a banca confere o Blackjack antes de você jogar.</p>') +
       D('Par Perfeito (aposta lateral)', '<p>Aposta opcional (10 a ' + BJ.RULES.maxSide + ') feita junto com a principal: ganha se suas duas primeiras cartas forem iguais (mesmo número ou letra). A banca paga: <b>Misto</b> (cores diferentes, ex. 8♠ e 8♥) 6:1 · <b>Colorido</b> (mesma cor, naipes diferentes, ex. 8♥ e 8♦) 12:1 · <b>Perfeito</b> (mesmo naipe) 25:1. Não depende do resultado da mão.</p>') +
+      D('Ausência', '<p>Se você demorar mais de 40 s para apostar ou jogar (30 s no seguro), fica <b>ausente</b> 💤: a mesa joga por você pela estratégia básica e você não aposta nas próximas rodadas. Para voltar, toque em <b>Voltei</b> ou faça qualquer jogada.</p>') +
       D('Mesa e bots', '<p>Até ' + MAXP + ' jogadores contra a banca. Bots jogam pela estratégia básica e você pode assumir o lugar de um bot a qualquer momento. O baralho é de ' + BJ.RULES.decks + ' baralhos e é reembaralhado quando restam poucas cartas. Ao encerrar a mesa, o resultado entra no Ranking.</p>');
   }
 
@@ -355,6 +366,7 @@
       case 'bj-skip': f.editing = false; play('BET', { bet: 0, side: 0 }); break;
       case 'bj-rebet': f.editing = true; f.bet = p.bet; f.side = p.side; S._forceRender = true; render(); break;
       case 'bj-insure': play('INSURE', { take: id === '1' }); break;
+      case 'bj-back': play('RETURN'); break;
       case 'bj-hit': play('HIT'); break;
       case 'bj-stand': play('STAND'); break;
       case 'bj-double': play('DOUBLE'); break;
@@ -371,7 +383,7 @@
     if (!g || !m || !S.user || !BOT || g.phase === 'ENDED') return;
     var me = mySeat(m); if (me < 0) return;
     var bots = [], humans = [];
-    m.seats.forEach(function (u, i) { if (isBot(u)) bots.push(i); else if (u) humans.push(i); });
+    m.seats.forEach(function (u, i) { if (isBot(u) || (g.players[i] && g.players[i].absent)) bots.push(i); if (!isBot(u) && u) humans.push(i); });
     if (!bots.length) return;
     var a; try { a = BOT.pendingAction(g, bots); } catch (e) { a = null; }
     clearTimeout(botTimer); botTimer = null;
@@ -381,7 +393,7 @@
       botTimer = null;
       if (f.sending || f.game !== g) { f.botSeen = null; S._forceRender = true; render(); return; }
       var a2; try { a2 = BOT.pendingAction(f.game, bots); } catch (e) { a2 = null; }
-      if (a2) act(a2, true);
+      if (a2) { a2.auto = true; act(a2, true); }
     }, base + rank * 2500);
   }
   function view(m) {

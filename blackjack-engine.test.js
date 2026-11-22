@@ -137,4 +137,15 @@ t('humano assume o lugar do bot: saldo conta a partir da entrada', () => {
   s = A(s, { type: 'STAND', player: 0 }); s = A(s, { type: 'STAND', player: 1 });
   const st = E.standings(s).find((x) => x.id === 'humano'); eq(st.net, s.players[1].roundNet);
 });
+t('ausente: só depois do limite, jogam por ele e ele volta ao agir', () => {
+  let s = game(2, ['10S', '10D', '9S', '7H', '8D', '8C']); s.lastAt = 1000;
+  eq(E.applyAction(s, { type: 'ABSENT', player: 0, at: 20000 }).ok, false); // cedo demais
+  s = A(s, { type: 'BET', player: 1, bet: 50, side: 0, at: 5000 });
+  eq(E.applyAction(s, { type: 'ABSENT', player: 1, at: 99000 }).ok, false); // já apostou, não deve nada
+  s = A(s, { type: 'ABSENT', player: 0, at: 60000 }); eq(s.players[0].absent, true);
+  eq(E.applyAction(s, { type: 'ABSENT', player: 0, at: 61000 }).ok, false);
+  s = A(s, { type: 'BET', player: 0, bet: 0, side: 0, auto: true, at: 60100 }); eq(s.players[0].absent, true); // ação automática não tira o ausente
+  eq(s.phase, 'PLAYING'); eq(E.pending(s), [1]);
+  s = A(s, { type: 'RETURN', player: 0, at: 62000 }); eq(s.players[0].absent, false);
+});
 console.log(ok + ' passaram, ' + bad + ' falharam'); process.exit(bad ? 1 : 0);
